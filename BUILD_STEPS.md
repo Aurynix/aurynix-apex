@@ -42,11 +42,11 @@ Legend: `[x]` done · `[ ]` to do
 
 ## Phase 1 — Understand & Explore (Week 1)
 
-### 1.1 Problem framing — *Stage 1*
-- [ ] Define the target (`Converted`) and the **prediction moment** (lead creation, before any sales contact).
-- [ ] Define the unit of prediction (one lead), the consumer (SDR team via Aurynix Pulse), and the action taken per segment.
-- [ ] Define business success criteria (e.g. top 20% of leads capture ≥ X% of conversions) and ML success criteria (PR-AUC above baseline).
-- [ ] List assumptions and risks (leakage, imbalance, dataset representativeness).
+### 1.1 Problem framing — *Stage 1* ✅
+- [x] Define the target (`Converted`) and the **prediction moment** (lead creation, before any sales contact).
+- [x] Define the unit of prediction (one lead), the consumer (SDR team via Aurynix Pulse), and the action taken per segment.
+- [x] Define business success criteria (e.g. top 20% of leads capture ≥ X% of conversions) and ML success criteria (PR-AUC above baseline).
+- [x] List assumptions and risks (leakage, imbalance, dataset representativeness).
 - **Files:** `docs/problem_framing.md`
 - **Done when:** someone outside the project could read it and know exactly what is predicted, when, and how success is judged.
 
