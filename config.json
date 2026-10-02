@@ -16,6 +16,7 @@
   "files": {
     "raw_leads": "Leads.csv",
     "raw_data_dictionary": "Leads Data Dictionary.xlsx",
+    "interim_leads": "leads_clean.parquet",
     "model": "model.pkl",
     "model_meta": "model_meta.json",
     "reference_profile": "reference_profile.json"
@@ -30,7 +31,33 @@
   "data": {
     "target": "Converted",
     "id_columns": ["Prospect ID", "Lead Number"],
-    "missing_placeholders": ["Select"],
+    "missing_placeholders": ["Select", "unknown"],
+    "category_aliases": {
+      "Lead Source": { "google": "Google" }
+    },
+    "binary_columns": [
+      "Do Not Email",
+      "A free copy of Mastering The Interview"
+    ],
+    "numeric_columns": [
+      "TotalVisits",
+      "Total Time Spent on Website",
+      "Page Views Per Visit"
+    ],
+    "drop_columns": [
+      "Magazine",
+      "Receive More Updates About Our Courses",
+      "Update me on Supply Chain Content",
+      "Get updates on DM Content",
+      "I agree to pay the amount through cheque",
+      "Do Not Call",
+      "Search",
+      "Newspaper Article",
+      "X Education Forums",
+      "Newspaper",
+      "Digital Advertisement",
+      "Through Recommendations"
+    ],
     "leakage_columns": [],
     "rare_category_min_share": 0.01
   },

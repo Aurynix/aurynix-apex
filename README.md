@@ -322,7 +322,8 @@ aurynix-apex/
 │   └── processed/
 ├── docs/
 │   ├── problem_framing.md
-│   ├── data_dictionary.md         # leakage audit
+│   ├── data_dictionary.md         # sources & leakage audit
+│   ├── data_quality.md            # data quality findings & decisions
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md
@@ -416,7 +417,7 @@ Run `make help` for the full list.
 | Environment | `make venv` / `make install` / `make lock` | Create venv / install locked dependencies / update `uv.lock` |
 | Data | `make data-download` | Download the Kaggle dataset into `data/raw/` |
 | | `make data-info` | Print shape, hash, and target rate of the raw data |
-| | `make preprocess` | Clean data and build features |
+| | `make preprocess` | Clean data → `data/interim/` (features added in step 2.1) |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
