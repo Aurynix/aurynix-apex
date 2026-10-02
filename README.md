@@ -102,7 +102,7 @@ For every lead it returns:
 ## Dataset
 
 ### Primary: Lead Scoring Dataset (X Education)
-- Source: Kaggle (search *"Lead Scoring X Education"*, file `Leads.csv`)
+- Source: Kaggle, [`amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset) (saved as `data/raw/Leads.csv` by `make data-download`)
 - About 9,000 real leads from an online education company
 - Features: lead origin and source, website activity, demographics, engagement
 - Target: `Converted` (1 = converted, 0 = did not convert)
@@ -392,7 +392,12 @@ make install                       # install locked dependencies from uv.lock
 source .venv/bin/activate          # optional; make targets use `uv run`
 ```
 
-Download `Leads.csv` from Kaggle and place it in `data/raw/`.
+Download the dataset from Kaggle into `data/raw/` (no Kaggle login needed for this public dataset):
+
+```bash
+make data-download   # → data/raw/Leads.csv + data/raw/Leads Data Dictionary.xlsx
+make data-info       # print shape, SHA-256, and conversion rate
+```
 
 ```bash
 make pipeline      # preprocess + train
@@ -409,7 +414,9 @@ Run `make help` for the full list.
 | Group | Command | Description |
 |---|---|---|
 | Environment | `make venv` / `make install` / `make lock` | Create venv / install locked dependencies / update `uv.lock` |
-| Pipeline | `make preprocess` | Clean data and build features |
+| Data | `make data-download` | Download the Kaggle dataset into `data/raw/` |
+| | `make data-info` | Print shape, hash, and target rate of the raw data |
+| | `make preprocess` | Clean data and build features |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
