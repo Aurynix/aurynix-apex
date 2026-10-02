@@ -10,24 +10,24 @@
 
 | Field | Value |
 |---|---|
-| Publisher | X Education (online education company), published on Kaggle |
-| How to find | Kaggle search: *"Lead Scoring X Education"* |
-| Kaggle URL | _TBD: fill in the exact dataset page used_ |
-| License / terms | _TBD: copy from the Kaggle dataset page_ |
-| File | `Leads.csv` → `data/raw/Leads.csv` (git-ignored) |
-| Downloaded on | _TBD_ |
-| SHA-256 | _TBD: from `make data-info`_ |
-| Size | _TBD_ |
-| Rows × columns | _TBD_ (expected about 9,000 rows) |
+| Dataset | *Lead Scoring Dataset* (X Education, an online education company) |
+| Kaggle | [`amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset), version 2 (last updated 2020-08-17) |
+| License | Listed as **Unknown** on Kaggle. Used for research and portfolio purposes only; the data is never redistributed or committed to this repo. |
+| Files | `Lead Scoring.csv` → `data/raw/Leads.csv`<br>`Leads Data Dictionary.xlsx` → `data/raw/Leads Data Dictionary.xlsx` (publisher's column descriptions)<br>Both git-ignored |
+| Downloaded on | 2026-10-02, with `make data-download` (`kagglehub`) |
+| SHA-256 (`Leads.csv`) | `1426dffd94246b8c7f08d1080d9c04115a0c4b67eadcba1ed9d2fa10d3762802` |
+| Size | 2.37 MB |
+| Rows × columns | **9,240 × 37** |
 | Target | `Converted` (1 = converted, 0 = not converted) |
-| Conversion rate | _TBD_ (expected about 38%) |
+| Conversion rate | **38.54%** (3,561 converted · 5,679 not converted); moderately imbalanced |
 
 The SHA-256 hash pins the exact file. If a re-download gives a different hash, the dataset changed and every downstream result must be re-checked.
 
-To fill in the _TBD_ values, run:
+To reproduce:
 
 ```bash
-make data-info
+make data-download   # fetch from Kaggle into data/raw/
+make data-info       # print shape, SHA-256, conversion rate, and column list
 ```
 
 ### 1.2 Secondary (planned): Bank Marketing (UCI, id 222)
