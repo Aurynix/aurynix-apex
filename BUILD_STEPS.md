@@ -10,6 +10,21 @@ The working plan for building Apex, one step at a time. Each step ends with a sh
 
 Legend: `[x]` done · `[ ]` to do
 
+### Git workflow
+
+`main` only changes through pull requests. Each step gets its own branch from the latest `main`:
+
+```bash
+git switch main && git pull                     # start from the latest main
+git switch -c feature/1.1-problem-framing       # one branch per step
+# ... work, make lint, make test, commit ...
+git push -u origin feature/1.1-problem-framing
+gh pr create --base main                        # review and merge on GitHub
+```
+
+Branch prefixes: `feature/<step>-<name>` for build steps, `docs/…` for documentation-only changes, `fix/…` for bug fixes, `chore/…` for tooling.
+The step's checkbox and **Log** entry are updated in the same branch.
+
 ---
 
 ## Phase 0 — Project Setup
@@ -222,3 +237,4 @@ Legend: `[x]` done · `[ ]` to do
 |---|---|---|
 | 2026-10-02 | 0.1–0.4 | README, .gitignore, project structure, and build plan created. |
 | 2026-10-02 | 0.5 | uv + uv.lock (Python 3.11), dependencies installed, lint and 5 config tests passing, first commit pushed. |
+| 2026-10-02 | — | Git workflow: one branch per step from `main`, merged via pull request. |
