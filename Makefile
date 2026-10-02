@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock preprocess train cv predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-info preprocess train cv predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -23,6 +23,9 @@ lock: ## Re-resolve dependencies and update uv.lock
 	uv lock
 
 # ---------- Pipeline ----------
+data-info: ## Print shape, hash, and target rate of data/raw/Leads.csv
+	$(RUN) python -m apex.data.load
+
 preprocess: ## Clean data and build features
 	$(todo)
 

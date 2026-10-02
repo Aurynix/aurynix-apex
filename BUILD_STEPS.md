@@ -50,10 +50,10 @@ Legend: `[x]` done · `[ ]` to do
 - **Files:** `docs/problem_framing.md`
 - **Done when:** someone outside the project could read it and know exactly what is predicted, when, and how success is judged.
 
-### 1.2 Data collection — *Stage 2*
+### 1.2 Data collection — *Stage 2* (in progress: waiting for Leads.csv)
 - [ ] Download `Leads.csv` from Kaggle into `data/raw/`.
-- [ ] Implement `load.py`: read raw CSV using paths from `config.json`.
-- [ ] Record source, download date, row/column counts, and file hash in `docs/data_dictionary.md`.
+- [x] Implement `load.py`: read raw CSV using paths from `config.json`, with tests; `make data-info` prints shape, hash, and target rate.
+- [ ] Record source, download date, row/column counts, and file hash in `docs/data_dictionary.md` (template ready; values pending the download).
 - **Files:** `src/apex/data/load.py`, `docs/data_dictionary.md`
 - **Done when:** `load_raw()` returns the DataFrame and the source is documented.
 

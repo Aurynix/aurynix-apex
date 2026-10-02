@@ -409,7 +409,8 @@ Run `make help` for the full list.
 | Group | Command | Description |
 |---|---|---|
 | Environment | `make venv` / `make install` / `make lock` | Create venv / install locked dependencies / update `uv.lock` |
-| Pipeline | `make preprocess` | Clean data and build features |
+| Pipeline | `make data-info` | Print shape, hash, and target rate of the raw data |
+| | `make preprocess` | Clean data and build features |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
