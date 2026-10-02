@@ -1,0 +1,27 @@
+from apex.config import PROJECT_ROOT, load_config, path
+
+
+def test_config_has_required_sections():
+    config = load_config()
+    for section in ("paths", "files", "data", "split", "segmentation", "monitoring"):
+        assert section in config
+
+
+def test_target_is_converted():
+    assert load_config()["data"]["target"] == "Converted"
+
+
+def test_path_resolves_inside_project():
+    raw_dir = path("raw_dir")
+    assert raw_dir.is_absolute()
+    assert raw_dir.is_relative_to(PROJECT_ROOT)
+
+
+def test_segment_shares_are_valid():
+    seg = load_config()["segmentation"]
+    assert 0 < seg["high_share"] + seg["medium_share"] < 1
+
+
+def test_psi_thresholds_are_ordered():
+    mon = load_config()["monitoring"]
+    assert 0 < mon["psi_warning"] < mon["psi_drift"]

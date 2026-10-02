@@ -1,0 +1,14 @@
+services:
+  api:
+    build: .
+    container_name: apex-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./reports:/app/reports
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "aurynix-apex",
+    "model_version": "apex-v0.1.0"
+  },
+  "paths": {
+    "raw_dir": "data/raw",
+    "interim_dir": "data/interim",
+    "processed_dir": "data/processed",
+    "models_dir": "models",
+    "figures_dir": "reports/figures",
+    "monitoring_reports_dir": "reports/monitoring",
+    "database": "data/apex.db",
+    "mlflow_tracking_uri": "mlruns"
+  },
+  "files": {
+    "raw_leads": "Leads.csv",
+    "model": "model.pkl",
+    "model_meta": "model_meta.json",
+    "reference_profile": "reference_profile.json"
+  },
+  "data": {
+    "target": "Converted",
+    "id_columns": ["Prospect ID", "Lead Number"],
+    "missing_placeholders": ["Select"],
+    "leakage_columns": [],
+    "rare_category_min_share": 0.01
+  },
+  "split": {
+    "random_state": 42,
+    "test_size": 0.2,
+    "val_size": 0.2
+  },
+  "segmentation": {
+    "high_share": 0.2,
+    "medium_share": 0.3
+  },
+  "monitoring": {
+    "psi_warning": 0.1,
+    "psi_drift": 0.25,
+    "n_bins": 10,
+    "window_days": 7,
+    "min_samples": 200,
+    "unseen_category_label": "__other__"
+  }
+}

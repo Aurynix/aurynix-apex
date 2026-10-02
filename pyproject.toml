@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aurynix-apex"
+version = "0.1.0"
+description = "Lead propensity engine: score, segment, explain, and monitor sales leads."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "MIT" }
+authors = [{ name = "Yazan Al-Sedih" }]
+dependencies = [
+    # Data
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pyarrow>=15.0",
+    # Modeling
+    "scikit-learn>=1.4",
+    "xgboost>=2.0",
+    "lightgbm>=4.3",
+    "optuna>=3.6",
+    # Tracking & explainability
+    "mlflow>=2.12",
+    "shap>=0.45",
+    # Visualization
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    # API
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "python-multipart>=0.0.9",
+    # Monitoring & demo
+    "evidently>=0.4",
+    "streamlit>=1.33",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.4",
+    "pytest>=8.1",
+    "httpx>=0.27",
+    "jupyterlab>=4.1",
+    "ipykernel>=6.29",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

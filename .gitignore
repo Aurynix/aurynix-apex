@@ -1,0 +1,84 @@
+# ============================================================
+# Aurynix Apex — .gitignore
+# ============================================================
+
+# ---------- Data (never committed) ----------
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+*.csv
+*.parquet
+*.feather
+*.xlsx
+
+# ---------- Model artifacts ----------
+models/*
+!models/.gitkeep
+*.pkl
+*.joblib
+*.onnx
+
+# ---------- Databases ----------
+*.db
+*.sqlite
+*.sqlite3
+
+# ---------- Experiment tracking ----------
+mlruns/
+mlartifacts/
+optuna*.db
+
+# ---------- Generated reports ----------
+reports/monitoring/*
+!reports/monitoring/.gitkeep
+
+# ---------- Environment & secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# ---------- Virtual environments ----------
+.venv/
+venv/
+env/
+
+# ---------- Testing & tooling caches ----------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ---------- Jupyter ----------
+.ipynb_checkpoints/
+
+# ---------- Streamlit ----------
+.streamlit/secrets.toml
+
+# ---------- Logs ----------
+logs/
+*.log
+
+# ---------- Editors & OS ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
