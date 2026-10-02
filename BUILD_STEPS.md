@@ -65,11 +65,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `docs/problem_framing.md`
 - **Done when:** someone outside the project could read it and know exactly what is predicted, when, and how success is judged.
 
-### 1.2 Data collection — *Stage 2*
-- [ ] Download `Leads.csv` from Kaggle into `data/raw/`.
-- [ ] Implement `load.py`: read raw CSV using paths from `config.json`.
-- [ ] Record source, download date, row/column counts, and file hash in `docs/data_dictionary.md`.
-- **Files:** `src/apex/data/load.py`, `docs/data_dictionary.md`
+### 1.2 Data collection — *Stage 2* ✅
+- [x] Download the dataset from Kaggle into `data/raw/` (`make data-download`, via `kagglehub`; saved as `Leads.csv`).
+- [x] Implement `load.py`: read raw CSV using paths from `config.json`, with tests; `make data-info` prints shape, hash, and target rate.
+- [x] Record source, download date, row/column counts, and file hash in `docs/data_dictionary.md` (9,240 × 37, conversion rate 38.54%).
+- **Files:** `src/apex/data/load.py`, `src/apex/data/download.py`, `docs/data_dictionary.md`
 - **Done when:** `load_raw()` returns the DataFrame and the source is documented.
 
 ### 1.3 Data quality checks — *Stage 3 (part 1)*
