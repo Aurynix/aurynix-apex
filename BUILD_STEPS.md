@@ -72,13 +72,13 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/data/load.py`, `src/apex/data/download.py`, `docs/data_dictionary.md`
 - **Done when:** `load_raw()` returns the DataFrame and the source is documented.
 
-### 1.3 Data quality checks — *Stage 3 (part 1)*
-- [ ] Missing values per column, including hidden nulls (`"Select"`).
-- [ ] Duplicates (rows and IDs), invalid values, numeric outliers (`TotalVisits`, `Page Views Per Visit`, time on site).
-- [ ] Class balance of `Converted`.
-- [ ] Implement `clean.py`: replace placeholders with NaN, fix types, drop ID columns, standardize category labels.
-- [ ] Unit tests for the cleaning functions.
-- **Files:** `notebooks/01_eda.ipynb`, `src/apex/data/clean.py`, `tests/test_clean.py`
+### 1.3 Data quality checks — *Stage 3 (part 1)* ✅
+- [x] Missing values per column, including hidden nulls (`"Select"`).
+- [x] Duplicates (rows and IDs), invalid values, numeric outliers (`TotalVisits`, `Page Views Per Visit`, time on site).
+- [x] Class balance of `Converted`.
+- [x] Implement `clean.py`: replace placeholders with NaN, fix types, drop ID columns, standardize category labels.
+- [x] Unit tests for the cleaning functions.
+- **Files:** `notebooks/01_eda.ipynb`, `src/apex/data/clean.py`, `tests/test_clean.py`, `docs/data_quality.md`, `reports/figures/dq_*.png`
 - **Done when:** cleaning is a tested function (not notebook code) and every issue found has a documented decision.
 
 ### 1.4 Leakage audit — *Stage 4*
@@ -238,3 +238,6 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-02 | 0.1–0.4 | README, .gitignore, project structure, and build plan created. |
 | 2026-10-02 | 0.5 | uv + uv.lock (Python 3.11), dependencies installed, lint and 5 config tests passing, first commit pushed. |
 | 2026-10-02 | — | Git workflow: one branch per step from `main`, merged via pull request. |
+| 2026-10-02 | 1.1 | Problem framing: prediction moment, capacity-based segments, business + ML success criteria, risks. |
+| 2026-10-02 | 1.2 | Kaggle download (`make data-download`), loader, source record: 9,240 × 37, conversion rate 38.54%. |
+| 2026-10-02 | 1.3 | Data quality: `"Select"` hides up to 54.6% missing per column; missingness is informative (kept); 12 constant/near-constant columns dropped; stateless `clean.py` → 9,240 × 23; leakage suspects flagged for 1.4. |

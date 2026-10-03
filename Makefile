@@ -29,8 +29,8 @@ data-download: ## Download the Kaggle dataset into data/raw/
 data-info: ## Print shape, hash, and target rate of data/raw/Leads.csv
 	$(RUN) python -m apex.data.load
 
-preprocess: ## Clean data and build features
-	$(todo)
+preprocess: ## Clean data (features are added in step 2.1)
+	$(RUN) python -m apex.data.clean
 
 train: ## Train model, save artifacts and reference profile
 	$(todo)
