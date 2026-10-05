@@ -148,8 +148,8 @@ For every lead it returns:
 | 5 | **Preprocessing & Feature Engineering** | `sklearn` `Pipeline` + `ColumnTransformer`, rare-category grouping, engineered features | `src/apex/data/` |
 | 6 | **Data Splitting** | Stratified train / validation / test; test set used once | Fixed, seeded splits |
 | 7 | **Baseline** | Majority-class baseline and Logistic Regression | Baseline metrics |
-| 8 | **Model Comparison** | Random Forest, XGBoost, LightGBM, all tracked in MLflow | Comparison table |
-| 9 | **Imbalance & Tuning** | Class weights vs. resampling; Optuna with cross-validation | Tuned model |
+| 8 | **Cross-validation & Feature Selection** | Stratified 5-fold CV; keep the simplest feature set that scores the same; tracked in MLflow | Selected features |
+| 9 | **Tuning** | Grid search over Logistic Regression `C` and class weights, with cross-validation | Tuned model |
 | 10 | **Evaluation & Calibration** | PR-AUC, ROC-AUC, lift/gain, calibration curve, Brier score | Validation Report |
 | 11 | **Segmentation** | Map probabilities to High / Medium / Low using sales capacity | Segmentation Methodology |
 | 12 | **Explainability** | Global and per-lead SHAP explanations | Explainability Report |
@@ -299,8 +299,8 @@ Drift shows that the **data** changed, not that the model is **wrong**. Once con
 |---|---|
 | Language | Python 3.11 |
 | Data | pandas, NumPy, PyArrow |
-| Modeling | scikit-learn, XGBoost, LightGBM |
-| Tuning | Optuna |
+| Modeling | scikit-learn (Logistic Regression) |
+| Tuning | scikit-learn grid search |
 | Experiment Tracking | MLflow |
 | Explainability | SHAP |
 | Visualization | Matplotlib, Seaborn |
@@ -423,7 +423,7 @@ Run `make help` for the full list.
 | | `make split` | Create the fixed train / validation / test split |
 | | `make baselines` | Fit no-skill + Logistic Regression, log to MLflow |
 | | `make train` | Train model, save artifacts and reference profile |
-| | `make cv` | Cross-validation |
+| | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -453,8 +453,8 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Preprocessing and feature pipeline
 - [x] Stratified splits
 - [x] Baselines (majority class, Logistic Regression)
-- [ ] Model comparison in MLflow
-- [ ] Imbalance handling and Optuna tuning
+- [x] Cross-validation and feature selection
+- [ ] Tuning (`C`, class weights)
 
 ### Week 3: Evaluate & Explain
 - [ ] Final test-set evaluation
