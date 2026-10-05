@@ -182,19 +182,18 @@ The step's checkbox and **Log** entry are updated in the same branch.
 
 ## Phase 4 — Ship & Monitor (Week 4)
 
-### 4.1 API foundation — *Stage 13 (part 1)*
-- [ ] `app.py`, `schemas.py`, `dependencies.py` (load model + SHAP explainer once).
-- [ ] Routers: `/health`, `/model/info`.
-- [ ] `make run` / `make run-prod`.
-- **Files:** `src/apex/api/`
-- **Done when:** `/docs` loads and `/model/info` returns the model's metadata.
+### 4.1 API serving — *Stage 13* ✅
+> Design: routers only validate; one `ScoringService` does score → segment → explain → log. The API loads saved artifacts at startup and never trains. Reasons are part of every prediction, so there is no separate `/predict/explain` endpoint.
+- [x] `app.py` (app, lifespan, `/health`), `schemas.py` (validation only), `dependencies.py` (load model once, inject service), `service.py` (all logic).
+- [x] Endpoints: `GET /health`, `GET /model/info`, `POST /predict/single`, `POST /predict/batch`.
+- [x] `database.py`: `predictions` table; every scored lead is logged.
+- [x] `make run` / `make run-prod`.
+- [x] API tests with FastAPI `TestClient`.
+- **Files:** `src/apex/api/`, `tests/test_api.py`, `docs/api.md`, `README.md`, `Makefile`
+- **Done when:** `/docs` loads, `/model/info` returns the model's metadata, predictions match the contract in `docs/api.md`, and every prediction is logged.
 
-### 4.2 Prediction endpoints & logging — *Stage 13 (part 2)*
-- [ ] `/predict/single`, `/predict/batch` (JSON list + CSV upload), `/predict/explain`.
-- [ ] `database.py`: `predictions` table; every scored lead is logged.
-- [ ] API tests with FastAPI `TestClient`.
-- **Files:** `src/apex/api/routers/predict.py`, `src/apex/api/database.py`, `tests/test_api.py`
-- **Done when:** the response matches the README contract and every prediction is logged.
+### 4.2 Prediction endpoints & logging ✅
+- [x] Merged into 4.1 (single + batch endpoints, logging, API tests). CSV upload for batch scoring stays with `make predict` for now.
 
 ### 4.3 Training job endpoint
 - [ ] `/pipeline/train` starts a background job; `/pipeline/jobs/{id}` reports status.
@@ -257,3 +256,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 3.3 | Segmentation (`make segments`): thresholds High ≥ 0.751, Medium ≥ 0.270 from out-of-fold scores; test: High 84.1% conversion (43% of buyers), Low 11.8% (7.1×); High + Medium hold 84.6% of buyers. |
 | 2026-10-06 | 3.4 | Explainability (`make explain`): exact linear SHAP (weight × (value − mean)), matches `shap.LinearExplainer`; one-hot and the 4 website inputs grouped into readable reasons; top drivers: website activity, occupation, lead origin, specialization; agrees with EDA; `Explainer.explain_one(lead)` returns probability + top reasons up / down. |
 | 2026-10-06 | 3.5 | `make train` fits the final model on all 9,240 leads and saves `model.pkl`, `model_meta.json`, `reference_profile.json`, `model_card.json` (risk rating Low); thresholds from out-of-fold scores on all rows (High ≥ 0.746, Medium ≥ 0.275); `make predict` → `data/predictions.csv`; `make pipeline` runs end to end. |
+| 2026-10-06 | 4.1 (+4.2) | API serving (`make run`): `/health`, `/model/info`, `/predict/single`, `/predict/batch`; thin routers + `ScoringService` (score → segment → explain → log to SQLite); model loaded once at startup, never trained in the API; fixed: missing visits with 0 time on site → 0 visits (as in training). 80 tests. |
