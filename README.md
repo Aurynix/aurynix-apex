@@ -323,6 +323,7 @@ aurynix-apex/
 │   ├── data_dictionary.md         # sources & leakage audit
 │   ├── data_quality.md            # data quality findings & decisions
 │   ├── data_cleaning.md           # cleaning steps & why
+│   ├── eda.md                     # EDA findings & feature ideas
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md
@@ -414,6 +415,7 @@ Run `make help` for the full list.
 | Data | `make data-download` | Download the Kaggle dataset into `data/raw/` |
 | | `make data-info` | Print shape, hash, and target rate of the raw data |
 | | `make leakage` | Compare a quick model with and without leakage suspects |
+| | `make eda` | Print EDA tables and save figures to `reports/figures/` |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
