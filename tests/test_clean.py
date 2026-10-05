@@ -4,8 +4,11 @@ import pytest
 from apex.config import load_config
 from apex.data.clean import (
     apply_aliases,
+    cap_outliers,
     clean,
     encode_binary,
+    fill_missing,
+    group_other,
     normalize_text,
     replace_placeholders,
     validate,
@@ -78,14 +81,42 @@ def test_validate_rejects_negative_numbers(raw):
         validate(raw, "Converted", ["TotalVisits"])
 
 
+def test_validate_rejects_page_views_without_visits():
+    df = pd.DataFrame({"TotalVisits": [0], "Page Views Per Visit": [2.0]})
+    with pytest.raises(ValueError, match="0 visits"):
+        validate(df, None, [])
+
+
+def test_group_other_keeps_listed_values_and_missing():
+    df = pd.DataFrame({"Country": ["India", "Qatar", None]})
+    out = group_other(df, {"Country": ["India"]})
+    assert out["Country"].tolist()[:2] == ["India", "Other"]
+    assert pd.isna(out.loc[2, "Country"])
+
+
+def test_fill_missing_uses_fixed_values():
+    df = pd.DataFrame({"TotalVisits": [None, 4.0], "City": [None, "Mumbai"]})
+    out = fill_missing(df, {"TotalVisits": 3}, "Missing")
+    assert out["TotalVisits"].tolist() == [3, 4]
+    assert out["City"].tolist() == ["Missing", "Mumbai"]
+
+
+def test_cap_outliers_clips_but_keeps_rows():
+    df = pd.DataFrame({"TotalVisits": [2, 251]})
+    out = cap_outliers(df, {"TotalVisits": 30})
+    assert out["TotalVisits"].tolist() == [2, 30]
+
+
 def test_clean_end_to_end(raw):
     out = clean(raw)
     # IDs and configured constant columns are dropped
     assert not {"Prospect ID", "Lead Number", "Magazine"} & set(out.columns)
-    # rows are never dropped: missing values carry signal (docs/data_quality.md)
+    # rows are never dropped: missing values carry signal (docs/data_cleaning.md)
     assert len(out) == len(raw)
     assert (out["Lead Source"] == "Google").sum() == 2
-    assert out["City"].isna().sum() == 3
+    assert (out["City"] == "Missing").sum() == 3
+    assert out.drop(columns=["Converted"]).notna().all().all()
+    assert out["TotalVisits"].dtype == int
 
 
 def test_clean_works_without_target(raw):

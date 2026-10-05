@@ -3,7 +3,7 @@
 > Stage 3, part 1 (step 1.3). Data: `data/raw/Leads.csv`, 9,240 rows × 37 columns, SHA-256 `1426dffd…3762802` (see [data_dictionary.md](data_dictionary.md)).
 > Reproduce with [`notebooks/01_eda.ipynb`](../notebooks/01_eda.ipynb). Cleaning code: [`src/apex/data/clean.py`](../src/apex/data/clean.py).
 
-Every issue found below has a **decision** with a reason. The cleaning rules live in `config.json → data` and are **stateless**: nothing is learned from the data, so the same rules apply to one new lead at prediction time. Anything that must be learned from data (outlier caps, rare-category grouping, imputation) is deferred to the feature pipeline (step 2.1), where it is fitted on the training split only.
+Every issue found below has a **decision** with a reason. The cleaning rules live in `config.json → data` and are **stateless**: nothing is learned from the data, so the same rules apply to one new lead at prediction time. Filling missing values and capping outliers were added later with fixed values; see [data_cleaning.md](data_cleaning.md) for the full cleaning steps.
 
 ---
 
@@ -13,19 +13,19 @@ Every issue found below has a **decision** with a reason. The cleaning rules liv
 |---|---|---|---|---|
 | 1 | `"Select"` = hidden missing value | 4 columns, up to 54.6% of rows | Convert to missing | `clean.py` |
 | 2 | `"unknown"` in `Country` | 5 rows | Convert to missing | `clean.py` |
-| 3 | High missing rates | 8 columns ≥ 30% | **Keep columns and rows**; missingness is informative | Step 2.1 imputes with a "Missing" category |
+| 3 | High missing rates | 8 columns ≥ 30% | **Keep rows**; missingness is informative. Fill with `"Missing"`; drop `How did you hear…` (78.5%) | `clean.py` ([data_cleaning.md](data_cleaning.md)) |
 | 4 | Constant columns | 5 columns | Drop | `clean.py` |
 | 5 | Near-constant columns (≤ 14 "Yes" of 9,240) | 7 columns | Drop | `clean.py` |
 | 6 | Spelling variants (`google` vs `Google`) | 5 rows | Merge | `clean.py` |
 | 7 | Inconsistent whitespace in labels | e.g. `Tags` | Strip and collapse spaces | `clean.py` |
 | 8 | Yes/No text columns | 2 kept columns | Encode as 1/0 | `clean.py` |
 | 9 | ID columns | 2 columns | Drop from features | `clean.py` |
-| 10 | Outliers in `TotalVisits`, `Page Views Per Visit` | max 251 and 55 visits | **Keep rows**; cap in step 2.1 (fitted on train) | Step 2.1 |
+| 10 | Outliers in `TotalVisits`, `Page Views Per Visit` | max 251 and 55 visits | **Keep rows**; cap at 30 and 15 | `clean.py` ([data_cleaning.md](data_cleaning.md)) |
 | 11 | Rows identical except for IDs | 1,489 rows in 193 groups | **Keep**; they are different leads | — |
-| 12 | Rare categories | e.g. 21 `Lead Source` values, many with < 10 rows | Group in step 2.1 (fitted on train) | Step 2.1 |
+| 12 | Rare categories | e.g. 21 `Lead Source` values, many with < 10 rows | `Country` → India / Other in `clean.py`; others grouped in step 2.1 (fitted on train) | `clean.py`, step 2.1 |
 | 13 | Leakage suspects | see below | 9 columns dropped (step 1.4, ADR-001) | `clean.py` |
 
-**Result:** `data/interim/leads_clean.parquet`, 9,240 rows × 23 columns (no rows removed); 14 columns after the leakage columns are dropped in step 1.4.
+**Result:** `data/interim/leads_clean.parquet`, 9,240 rows × 23 columns (no rows removed); 13 columns and no missing values after the leakage audit (step 1.4) and the cleaning in [data_cleaning.md](data_cleaning.md).
 
 ---
 
@@ -53,7 +53,7 @@ Overall conversion rate: 38.5%.
 
 **Decisions**
 - `"Select"` and `"unknown"` → missing (`config.json → data.missing_placeholders`).
-- **No rows are dropped and no columns are dropped for missingness alone.** Missingness is strongly linked to the target (e.g. occupation missing: 13.8% conversion vs. 48.7%), so "missing" is signal. Step 2.1 imputes categoricals with an explicit `"Missing"` category and adds indicators where useful.
+- **No rows are dropped and no columns are dropped for missingness alone.** Missingness is strongly linked to the target (e.g. occupation missing: 13.8% conversion vs. 48.7%), so "missing" is signal. `clean.py` fills categoricals with an explicit `"Missing"` category ([data_cleaning.md](data_cleaning.md)).
 - ⚠️ **Why** a field is missing matters for leakage: if occupation or "what matters most" are filled in **by the sales rep during the call**, then "present" means "the lead was contacted", which leaks the outcome. This is checked in step 1.4.
 - `TotalVisits` and `Page Views Per Visit` are missing on the **same 137 rows**, mostly `Lead Add Form` (110) and `Lead Import` (24) leads, which never visited the website through tracked pages. Their 73% conversion rate is driven by `Lead Add Form` (see section 6).
 
@@ -87,7 +87,7 @@ After dropping constant/near-constant columns, two Yes/No columns remain: `Do No
 
 - **Consistency checks pass:** no negative values; `TotalVisits` is always a whole number; zero visits always comes with zero time and zero page views. Only 4 leads have visits > 0 but time = 0, which is plausible (bounce).
 - **Zeros are real:** the 2,189 zero-activity leads are `API` (1,602), `Lead Add Form` (557) and `Lead Import` (30) leads that never came through the website. Zero is a meaningful value, not a missing one.
-- **Decision:** keep all rows. The extreme values (251 visits, 55 pages per visit) are plausible bots or heavy users, not data entry errors. Step 2.1 caps them at a high percentile **learned from the training split**, so the cap never sees validation or test data. Tree models are barely affected; the cap mainly helps Logistic Regression.
+- **Decision:** keep all rows. The extreme values (251 visits, 55 pages per visit) are plausible bots or heavy users, not data entry errors. `clean.py` caps them at fixed limits (30 visits, 15 pages per visit; see [data_cleaning.md](data_cleaning.md)). Tree models are barely affected; the cap mainly helps Logistic Regression.
 - `validate()` rejects negative numbers and a non-0/1 target, so impossible values fail loudly.
 
 ## 6. Duplicates

@@ -324,6 +324,7 @@ aurynix-apex/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
 │   ├── data_quality.md            # data quality findings & decisions
+│   ├── data_cleaning.md           # cleaning steps & why
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md

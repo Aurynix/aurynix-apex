@@ -57,7 +57,7 @@ The **prediction-moment test** for every column: *is this known when the lead en
 | Last Activity | category | Last activity on the lead (Email Opened, SMS Sent, Had a Phone Conversation, …) | 1.1 | ❌ | **Leakage** | "Last" = state at data export; includes sales actions (`SMS Sent` → 69% conversion) |
 | Country | category | Country of the lead | 26.6 | ✅ | Keep | Form / IP data |
 | Specialization | category | Industry the lead worked in | 36.6 | ✅ | Keep | Selected by the lead on the form |
-| How did you hear about X Education | category | Where the lead heard of X Education | 78.5 | ✅ | Keep | Selected by the lead on the form |
+| How did you hear about X Education | category | Where the lead heard of X Education | 78.5 | ✅ | Drop | Selected by the lead, but 78.5% missing and weak signal ([data_cleaning.md](data_cleaning.md)) |
 | What is your current occupation | category | Student, unemployed, working professional, … | 29.1 | ✅ | Keep | Selected by the lead ("option selected by the customer") |
 | What matters most to you in choosing a course | category | Main reason for taking a course | 29.3 | ✅ | Keep | Selected by the lead |
 | Search, Magazine, Newspaper Article, X Education Forums, Newspaper, Digital Advertisement, Through Recommendations | binary | Where the lead saw an ad | 0 | ✅ | Drop | Constant / near-constant (step 1.3) |
@@ -70,7 +70,7 @@ The **prediction-moment test** for every column: *is this known when the lead en
 | A free copy of Mastering The Interview | binary | Lead asked for the free book | 0 | ✅ | Keep | Chosen by the lead on the form |
 | Last Notable Activity | category | Last notable activity on the lead | 0 | ❌ | **Leakage** | Same as `Last Activity` |
 
-**Result:** 9 leakage columns in `config.json → data.leakage_columns`, dropped by `clean.py`. The cleaned data has **9,240 rows × 14 columns** (13 features + target).
+**Result:** 9 leakage columns in `config.json → data.leakage_columns`, dropped by `clean.py`. After all cleaning the data has **9,240 rows × 13 columns** (12 features + target); see [data_cleaning.md](data_cleaning.md).
 
 ### Evidence: quick model with and without suspects
 
@@ -78,12 +78,12 @@ The **prediction-moment test** for every column: *is this known when the lead en
 
 | Columns | PR-AUC | Gain |
 |---|---|---|
-| base (no suspects) | 0.804 | — |
+| base (no suspects) | 0.805 | — |
 | + Tags | **0.952** | **+0.148** |
-| + Lead Quality | 0.865 | +0.061 |
-| + Last Activity, Last Notable Activity | 0.840 | +0.036 |
-| + Asymmetrique (4 columns) | 0.827 | +0.023 |
-| + Lead Profile | 0.823 | +0.019 |
+| + Lead Quality | 0.866 | +0.061 |
+| + Last Activity, Last Notable Activity | 0.841 | +0.036 |
+| + Asymmetrique (4 columns) | 0.827 | +0.022 |
+| + Lead Profile | 0.824 | +0.020 |
 
 `Tags` alone lifts PR-AUC by 0.15: a model with it would look excellent offline and fail in production, where tags do not exist yet. The smaller gains are not proof of leakage on their own; those columns are dropped because of **what they mean** (see table).
 
