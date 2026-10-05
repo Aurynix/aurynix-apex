@@ -7,6 +7,7 @@ scored on the validation split, and logged to MLflow.
 Commands:
     python -m apex.models.train baselines   # step 2.3: train → validation (`make baselines`)
     python -m apex.models.train test        # step 3.1: train + val → test, ONCE (`make evaluate`)
+    python -m apex.models.train calibration # step 3.2: calibration check (`make calibration`)
 
 Then `make mlflow-ui` to browse the runs.
 """
@@ -16,14 +17,16 @@ from typing import Any
 
 import mlflow
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import Pipeline, make_pipeline
 
 from apex.config import load_config, path
 from apex.data.features import build_pipeline
 from apex.data.split import load_splits
-from apex.models.evaluate import evaluate, plot_test_report
+from apex.models.evaluate import calibration_table, evaluate, plot_calibration, plot_test_report
 
 EXPERIMENT = "apex-lead-scoring"
 
@@ -118,7 +121,50 @@ def run_test() -> dict[str, float]:
     return metrics
 
 
+def run_calibration() -> pd.DataFrame:
+    """Step 3.2: compare raw, Platt, and isotonic probabilities on out-of-fold predictions.
+
+    Every lead in train + validation is scored by a model that did not see it
+    (5-fold), so calibration is checked on held-out data without the test split.
+    """
+    cfg = load_config()
+    mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
+    mlflow.set_experiment(EXPERIMENT)
+
+    parts = load_splits()
+    target = cfg["data"]["target"]
+    data = pd.concat([parts["train"], parts["val"]])
+    X, y = data.drop(columns=[target]), data[target]
+    folds = StratifiedKFold(5, shuffle=True, random_state=cfg["split"]["random_state"])
+
+    candidates = {
+        "raw": make_model(cfg),
+        "platt": CalibratedClassifierCV(make_model(cfg), method="sigmoid", cv=5),
+        "isotonic": CalibratedClassifierCV(make_model(cfg), method="isotonic", cv=5),
+    }
+    rows, curves = {}, {}
+    for name, model in candidates.items():
+        scores = cross_val_predict(model, X, y, cv=folds, method="predict_proba")[:, 1]
+        metrics = evaluate(y, scores)
+        rows[name] = {k: metrics[k] for k in ("ece", "brier", "pr_auc", "roc_auc")}
+        rows[name]["mean_predicted"] = round(float(scores.mean()), 4)
+        curves[name] = calibration_table(y, scores)
+        with mlflow.start_run(run_name=f"calibration_{name}"):
+            mlflow.log_params({"model": "logistic_regression", "calibration": name})
+            mlflow.log_metrics({f"oof_{k}": v for k, v in metrics.items()})
+
+    figure = path("figures_dir") / "calibration.png"
+    plot_calibration(curves, figure, f"Calibration, out-of-fold ({len(X):,} leads)")
+
+    print(f"Out-of-fold predictions on train + validation ({len(X):,} leads)")
+    print(f"actual conversion rate: {y.mean():.4f}\n")
+    print(pd.DataFrame(rows).T.to_string())
+    print("\nraw model, per bin:\n", curves["raw"].round(3).to_string())
+    print(f"\nfigure: {figure}")
+    return pd.DataFrame(rows).T
+
+
 if __name__ == "__main__":
-    commands = {"baselines": run_baselines, "test": run_test}
+    commands = {"baselines": run_baselines, "test": run_test, "calibration": run_calibration}
     command = sys.argv[1] if len(sys.argv) > 1 else "baselines"
     commands[command]()

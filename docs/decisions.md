@@ -70,3 +70,23 @@ Short records of decisions that shape the model. Newest last.
 - `balanced` class weights leave the ranking unchanged (0.8171 vs. 0.8176) but inflate probabilities (validation mean prediction 0.461 vs. actual 0.385; Brier 0.136 vs. 0.130). Segments are cut by share of leads, not by probability, so class weights bring no benefit, and calibrated probabilities are needed (step 3.2).
 
 **Consequences.** The tuned model is the default Logistic Regression: validation PR-AUC 0.839. Resampling (e.g. SMOTE) is not tried: if reweighting the classes does not change the ranking, resampling, which has a similar effect, is unlikely to.
+
+---
+
+## ADR-005: No extra calibration: keep raw Logistic Regression probabilities
+
+- **Date:** 2026-10-06 · **Step:** 3.2 · **Status:** Accepted
+
+**Context.** Probabilities are shown to sales reps, so they should be honest. Checked on out-of-fold predictions over train + validation (7,392 leads), without the test split: raw model vs. Platt scaling vs. isotonic regression.
+
+| | ECE | Brier | PR-AUC |
+|---|---|---|---|
+| Raw | 0.031 | 0.1377 | 0.824 |
+| Platt | 0.032 | 0.1378 | 0.824 |
+| Isotonic | 0.006 | 0.1362 | 0.821 |
+
+**Decision.** Keep the raw Logistic Regression probabilities.
+
+**Why.** The raw model already meets the target (ECE ≤ 0.05) and its average prediction matches the actual rate. Isotonic is better calibrated but adds 5 models and a step function, makes explanations indirect, and lowers PR-AUC slightly, for a Brier gain of 0.0015. Platt adds nothing to a model that is already a sigmoid.
+
+**Consequences.** Known bias: 0.5–0.6 scores convert ~10 points more than predicted, 0.8–0.9 scores ~10 points less. Segments (step 3.3) use ranks, so they are not affected. If exact percentages become important in the product, switch to isotonic (one line in `make_model`).

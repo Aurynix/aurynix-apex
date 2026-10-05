@@ -150,10 +150,10 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`, `tests/test_evaluate.py`, `reports/figures/test_evaluation.png`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** final metrics are recorded and the README results section is filled in.
 
-### 3.2 Probability calibration — *Stage 10 (part 2)*
-- [ ] Calibration curve + Brier score.
-- [ ] If needed, calibrate (isotonic / Platt) using held-out data only.
-- **Files:** `src/apex/models/train.py`, `reports/figures/`
+### 3.2 Probability calibration — *Stage 10 (part 2)* ✅
+- [x] Calibration curve + Brier score.
+- [x] If needed, calibrate (isotonic / Platt) using held-out data only.
+- **Files:** `src/apex/models/train.py`, `src/apex/models/evaluate.py`, `tests/test_evaluate.py`, `reports/figures/calibration.png`, `docs/models.md`, `docs/decisions.md` (ADR-005), `Makefile`
 - **Done when:** a predicted 0.70 means roughly 70% actually convert (within reason).
 
 ### 3.3 Segmentation — *Stage 11*
@@ -252,3 +252,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 2.4 | Plan changed for Logistic Regression (ADR-003). 5-fold CV on train (`make cv`): selected features (24) give the same PR-AUC as all features (51), 0.8176 ± 0.011; dropped `Page Views Per Visit`, `City`, `Country`, free-book flag; `Specialization` → Given / Missing. Validation PR-AUC 0.839. |
 | 2026-10-06 | 2.5 | Tuning (`make tune`, 14 setups): `C` 0.3–10 is a plateau (CV PR-AUC ≈ 0.817); `balanced` class weights do not improve ranking and inflate probabilities (val mean 0.461 vs. 0.385). Kept `C = 1`, no class weights (ADR-004, `config.json → model`); validation PR-AUC 0.839. |
 | 2026-10-06 | 3.1 | Test set used once (`make evaluate`, fitted on train + val): PR-AUC 0.787 (95% CI 0.756–0.816), ROC-AUC 0.855, Brier 0.149; top 20% precision 83.2% / recall 43.3%, top 50% recall 85.4%; all business targets met. Lower than validation (0.839): sampling variation, same lead mix. README results filled in. |
+| 2026-10-06 | 3.2 | Calibration (`make calibration`, out-of-fold on train + val): raw LR ECE 0.031 (target ≤ 0.05), mean prediction 0.386 vs. 0.385 actual; isotonic ECE 0.006 but 5 models and indirect explanations. Kept raw probabilities (ADR-005). |
