@@ -4,8 +4,11 @@ The model is Logistic Regression on the feature pipeline (ADR-003). Step 2.3
 compares it with the no-skill baseline: both are fitted on the train split,
 scored on the validation split, and logged to MLflow.
 
-Run `python -m apex.models.train baselines` (or `make baselines`), then
-`make mlflow-ui` to browse the runs.
+Commands:
+    python -m apex.models.train baselines   # step 2.3: train → validation (`make baselines`)
+    python -m apex.models.train test        # step 3.1: train + val → test, ONCE (`make evaluate`)
+
+Then `make mlflow-ui` to browse the runs.
 """
 
 import sys
@@ -17,10 +20,10 @@ from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline
 
-from apex.config import load_config
+from apex.config import load_config, path
 from apex.data.features import build_pipeline
 from apex.data.split import load_splits
-from apex.models.evaluate import evaluate
+from apex.models.evaluate import evaluate, plot_test_report
 
 EXPERIMENT = "apex-lead-scoring"
 
@@ -85,7 +88,37 @@ def run_baselines() -> pd.DataFrame:
     return results
 
 
+def run_test() -> dict[str, float]:
+    """Step 3.1: retrain on train + validation, score the test split once, log and plot."""
+    cfg = load_config()
+    mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
+    mlflow.set_experiment(EXPERIMENT)
+
+    parts = load_splits(include_test=True)
+    target = cfg["data"]["target"]
+    fit = pd.concat([parts["train"], parts["val"]])
+    test = parts["test"]
+
+    model = make_model(cfg).fit(fit.drop(columns=[target]), fit[target])
+    scores = model.predict_proba(test.drop(columns=[target]))[:, 1]
+    metrics = evaluate(test[target], scores)
+
+    figure = path("figures_dir") / "test_evaluation.png"
+    plot_test_report(test[target], scores, figure, f"Test set ({len(test):,} leads, used once)")
+
+    with mlflow.start_run(run_name="final_test"):
+        mlflow.log_params({"model": "logistic_regression", "fit_rows": len(fit), **_params(model)})
+        mlflow.log_params({"test_rows": len(test)})
+        mlflow.log_metrics({f"test_{k}": v for k, v in metrics.items()})
+        mlflow.log_artifact(str(figure))
+
+    print(f"Fitted on train + validation ({len(fit):,} leads); test split ({len(test):,} leads)\n")
+    print(pd.Series(metrics).to_string())
+    print(f"\nfigure: {figure}")
+    return metrics
+
+
 if __name__ == "__main__":
-    commands = {"baselines": run_baselines}
+    commands = {"baselines": run_baselines, "test": run_test}
     command = sys.argv[1] if len(sys.argv) > 1 else "baselines"
     commands[command]()

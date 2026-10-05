@@ -44,3 +44,63 @@ def evaluate(y_true, y_score, shares: tuple[float, ...] = (0.2, 0.5)) -> dict[st
         metrics[f"recall_top{pct}"] = recall
         metrics[f"lift_top{pct}"] = recall / share
     return {name: round(float(value), 4) for name, value in metrics.items()}
+
+
+def plot_test_report(y_true, y_score, file, title: str) -> None:
+    """PR curve, ROC curve, cumulative gain and lift in one figure."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import precision_recall_curve, roc_curve
+
+    blue, ink, muted, grid, surface = "#2a78d6", "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
+    y_true = np.asarray(y_true)
+    rate = y_true.mean()
+
+    order = np.argsort(-np.asarray(y_score), kind="stable")
+    share = np.arange(1, len(y_true) + 1) / len(y_true)
+    gain = np.cumsum(y_true[order]) / y_true.sum()
+
+    precision, recall, _ = precision_recall_curve(y_true, y_score)
+    fpr, tpr, _ = roc_curve(y_true, y_score)
+    panels = [
+        ("Precision–recall curve", recall, precision, rate, "Recall", "Precision"),
+        ("ROC curve", fpr, tpr, None, "False positive rate", "True positive rate"),
+        ("Cumulative gain", share, gain, None, "Share of leads called", "Share of buyers found"),
+        ("Lift", share, gain / share, 1.0, "Share of leads called", "Lift vs. random"),
+    ]
+
+    fig, axes = plt.subplots(1, 4, figsize=(18, 4.6), facecolor=surface)
+    for ax, (name, x, y, flat, xlabel, ylabel) in zip(axes, panels, strict=True):
+        ax.plot(x, y, color=blue, linewidth=2)
+        if flat is not None:
+            ax.axhline(flat, color=muted, linestyle="--", linewidth=1)
+        else:
+            ax.plot([0, 1], [0, 1], color=muted, linestyle="--", linewidth=1)
+        ax.set_title(name, loc="left", fontsize=10, color=ink, fontweight="bold")
+        ax.set_xlabel(xlabel, fontsize=8, color=muted)
+        ax.set_ylabel(ylabel, fontsize=8, color=muted)
+        ax.set_facecolor(surface)
+        ax.tick_params(colors=muted, labelsize=8, length=0)
+        ax.grid(color=grid, linewidth=0.6)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
+
+    gain_ax, lift_ax = axes[2], axes[3]
+    for cut in (0.2, 0.5):
+        i = int(round(cut * len(y_true))) - 1
+        gain_ax.plot(share[i], gain[i], "o", color=blue, markersize=8)
+        gain_ax.annotate(
+            f"top {cut:.0%} → {gain[i]:.0%} of buyers",
+            (share[i], gain[i]),
+            xytext=(8, -14),
+            textcoords="offset points",
+            fontsize=8,
+            color=ink,
+        )
+    lift_ax.set_ylim(0, 1 / rate + 0.3)
+    fig.suptitle(title, x=0.01, ha="left", color=ink)
+    fig.tight_layout()
+    fig.savefig(file, dpi=120)
+    plt.close(fig)

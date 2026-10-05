@@ -30,3 +30,11 @@ def test_evaluate_ranking_metrics():
     assert metrics["pr_auc"] == pytest.approx(1.0)
     assert metrics["roc_auc"] == pytest.approx(1.0)
     assert 0 <= metrics["brier"] <= 1
+
+
+def test_plot_test_report_writes_a_figure(tmp_path):
+    from apex.models.evaluate import plot_test_report
+
+    file = tmp_path / "report.png"
+    plot_test_report(Y, SCORE, file, "test")
+    assert file.stat().st_size > 0

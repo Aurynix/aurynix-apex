@@ -143,11 +143,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 
 ## Phase 3 — Evaluate & Explain (Week 3)
 
-### 3.1 Final test evaluation — *Stage 10 (part 1)*
-- [ ] Retrain the chosen model on train + validation.
-- [ ] Evaluate on the test set **once**.
-- [ ] PR curve, ROC curve, cumulative gain and lift charts.
-- **Files:** `src/apex/models/evaluate.py`, `reports/figures/`
+### 3.1 Final test evaluation — *Stage 10 (part 1)* ✅
+- [x] Retrain the chosen model on train + validation.
+- [x] Evaluate on the test set **once**.
+- [x] PR curve, ROC curve, cumulative gain and lift charts.
+- **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`, `tests/test_evaluate.py`, `reports/figures/test_evaluation.png`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** final metrics are recorded and the README results section is filled in.
 
 ### 3.2 Probability calibration — *Stage 10 (part 2)*
@@ -251,3 +251,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 2.3 | Baselines (`make baselines`, MLflow on SQLite): no skill PR-AUC 0.385 vs. Logistic Regression **0.840** on validation; top 20% captures 46.2% of buyers (target ≥ 40%), top 50% 87.4%; LR chosen as the model (ADR-003). |
 | 2026-10-06 | 2.4 | Plan changed for Logistic Regression (ADR-003). 5-fold CV on train (`make cv`): selected features (24) give the same PR-AUC as all features (51), 0.8176 ± 0.011; dropped `Page Views Per Visit`, `City`, `Country`, free-book flag; `Specialization` → Given / Missing. Validation PR-AUC 0.839. |
 | 2026-10-06 | 2.5 | Tuning (`make tune`, 14 setups): `C` 0.3–10 is a plateau (CV PR-AUC ≈ 0.817); `balanced` class weights do not improve ranking and inflate probabilities (val mean 0.461 vs. 0.385). Kept `C = 1`, no class weights (ADR-004, `config.json → model`); validation PR-AUC 0.839. |
+| 2026-10-06 | 3.1 | Test set used once (`make evaluate`, fitted on train + val): PR-AUC 0.787 (95% CI 0.756–0.816), ROC-AUC 0.855, Brier 0.149; top 20% precision 83.2% / recall 43.3%, top 50% recall 85.4%; all business targets met. Lower than validation (0.839): sampling variation, same lead mix. README results filled in. |
