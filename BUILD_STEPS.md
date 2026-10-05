@@ -116,12 +116,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/data/split.py`, `tests/test_split.py`, `docs/splits.md`, `config.json`, `Makefile`
 - **Done when:** splits are fixed, reproducible, and class ratios match across splits.
 
-### 2.3 Baselines — *Stage 7*
-- [ ] Majority-class baseline.
-- [ ] Logistic Regression on the full pipeline.
-- [ ] Implement `evaluate.py`: PR-AUC, ROC-AUC, Brier, lift/gain at top-k.
-- [ ] Set up MLflow tracking (`make mlflow-ui`).
-- **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`
+### 2.3 Baselines — *Stage 7* ✅
+- [x] Majority-class baseline.
+- [x] Logistic Regression on the full pipeline.
+- [x] Implement `evaluate.py`: PR-AUC, ROC-AUC, Brier, lift/gain at top-k.
+- [x] Set up MLflow tracking (`make mlflow-ui`).
+- **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`, `tests/test_evaluate.py`, `tests/test_train.py`, `docs/models.md`, `docs/decisions.md` (ADR-003), `Makefile`
 - **Done when:** baseline metrics are logged in MLflow and become the bar to beat.
 
 ### 2.4 Model comparison — *Stage 8*
@@ -247,3 +247,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | 1.5 | EDA (`make eda`): time on site is the strongest numeric (14% → 69%), visits/page views flat; Lead Add Form 92.5%, Working Professional 92%, occupation missing 14%; "what matters most" duplicates occupation missingness; 7 feature ideas for 2.1 in `docs/eda.md`. |
 | 2026-10-05 | 2.1 | Feature pipeline (`make features`): clean → `time_per_visit`, `has_web_activity`, drop "what matters most" → scale + one-hot (rare/unseen → infrequent); 36 raw columns → 51 features; quick CV PR-AUC 0.810 → 0.816. |
 | 2026-10-05 | 2.2 | Stratified 60/20/20 split (`make split`) saved as `data/splits.csv`; conversion 38.5% in every split; `load_splits()` hides test unless `include_test=True`; 22% of val/test leads have a look-alike in train (kept, documented). |
+| 2026-10-06 | 2.3 | Baselines (`make baselines`, MLflow on SQLite): no skill PR-AUC 0.385 vs. Logistic Regression **0.840** on validation; top 20% captures 46.2% of buyers (target ≥ 40%), top 50% 87.4%; LR chosen as the model (ADR-003). |

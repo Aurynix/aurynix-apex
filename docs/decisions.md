@@ -33,3 +33,24 @@ Short records of decisions that shape the model. Newest last.
 **Why.** Keep it simple: one stateless function cleans the training file and a single API lead the same way, and the cleaned data has no missing values. The leak is tiny: two medians and two round caps read once from 9,240 rows.
 
 **Consequences.** Changing a fill value or cap is a config change and needs a retrain. Details: [data_cleaning.md](data_cleaning.md).
+
+---
+
+## ADR-003: Logistic Regression as the model
+
+- **Date:** 2026-10-06 · **Step:** 2.3 · **Status:** Accepted
+
+**Context.** Gradient boosting (LightGBM, XGBoost) often wins on tabular data, but it is harder to explain and its probabilities usually need calibration. A quick 5-fold CV on the **train split only**, default settings, same 51 features:
+
+| Model | PR-AUC | ROC-AUC |
+|---|---|---|
+| Logistic Regression | 0.818 ± 0.010 | 0.868 |
+| HistGradientBoosting | 0.818 ± 0.011 | 0.868 |
+| LightGBM | 0.818 ± 0.012 | 0.867 |
+| XGBoost | 0.812 ± 0.012 | 0.862 |
+
+**Decision.** Use Logistic Regression.
+
+**Why.** Same accuracy, and simpler: one weight per feature that a sales rep can understand, probabilities that are close to calibrated without extra steps, fast training and serving. The data is small (5,544 training leads) and the main signals add up independently (Lead Add Form, occupation, time on site), which is what a linear model captures.
+
+**Consequences.** Model work focuses on Logistic Regression settings (regularization strength `C`, class weights) rather than comparing model families. Validation baseline: PR-AUC 0.840, 46.2% of buyers in the top 20% ([models.md](models.md)).

@@ -10,7 +10,7 @@
     "monitoring_reports_dir": "reports/monitoring",
     "database": "data/apex.db",
     "splits": "data/splits.csv",
-    "mlflow_tracking_uri": "mlruns"
+    "mlflow_tracking_uri": "sqlite:///mlflow.db"
   },
   "files": {
     "raw_leads": "Leads.csv",

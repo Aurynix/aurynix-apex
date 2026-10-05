@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage eda features split train cv predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda features split baselines train cv predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
 RUN := uv run
+export MLFLOW_DISABLE_AGENT_HINT := 1
 
 # Placeholder for targets whose stage is not implemented yet.
 todo = @echo "⏳ '$@' is not implemented yet (see BUILD_STEPS.md)."
@@ -41,6 +42,9 @@ features: ## Fit the feature pipeline on all leads and list the features
 split: ## Create the fixed train / validation / test split (data/splits.csv)
 	$(RUN) python -m apex.data.split
 
+baselines: ## Fit no-skill + Logistic Regression baselines, log to MLflow
+	$(RUN) python -m apex.models.train baselines
+
 train: ## Train model, save artifacts and reference profile
 	$(todo)
 
@@ -67,7 +71,7 @@ monitor: ## Run drift monitoring
 	$(todo)
 
 mlflow-ui: ## Open MLflow at http://localhost:5000
-	$(RUN) mlflow ui --backend-store-uri mlruns --port 5000
+	$(RUN) mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 
 # ---------- Docker ----------
 docker-build: ## Build the Docker image
