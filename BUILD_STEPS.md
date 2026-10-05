@@ -163,11 +163,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/segment.py`, `tests/test_segment.py`, `src/apex/models/train.py`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** segments come out of config and the segment table shows that High captures far more conversions than its share of leads.
 
-### 3.4 Explainability — *Stage 12*
-- [ ] Global SHAP: summary plot and feature-importance ranking.
-- [ ] Per-lead SHAP: top positive and negative contributors, mapped back to readable feature names.
-- [ ] Sanity check: explanations agree with the EDA findings.
-- **Files:** `src/apex/models/explain.py`, `reports/figures/`
+### 3.4 Explainability — *Stage 12* ✅
+- [x] Global SHAP: summary plot and feature-importance ranking.
+- [x] Per-lead SHAP: top positive and negative contributors, mapped back to readable feature names.
+- [x] Sanity check: explanations agree with the EDA findings.
+- **Files:** `src/apex/models/explain.py`, `tests/test_explain.py`, `reports/figures/explain_importance.png`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** `explain_one(lead)` returns readable top reasons.
 
 ### 3.5 Training artifacts
@@ -254,3 +254,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 3.1 | Test set used once (`make evaluate`, fitted on train + val): PR-AUC 0.787 (95% CI 0.756–0.816), ROC-AUC 0.855, Brier 0.149; top 20% precision 83.2% / recall 43.3%, top 50% recall 85.4%; all business targets met. Lower than validation (0.839): sampling variation, same lead mix. README results filled in. |
 | 2026-10-06 | 3.2 | Calibration (`make calibration`, out-of-fold on train + val): raw LR ECE 0.031 (target ≤ 0.05), mean prediction 0.386 vs. 0.385 actual; isotonic ECE 0.006 but 5 models and indirect explanations. Kept raw probabilities (ADR-005). |
 | 2026-10-06 | 3.3 | Segmentation (`make segments`): thresholds High ≥ 0.751, Medium ≥ 0.270 from out-of-fold scores; test: High 84.1% conversion (43% of buyers), Low 11.8% (7.1×); High + Medium hold 84.6% of buyers. |
+| 2026-10-06 | 3.4 | Explainability (`make explain`): exact linear SHAP (weight × (value − mean)), matches `shap.LinearExplainer`; one-hot and the 4 website inputs grouped into readable reasons; top drivers: website activity, occupation, lead origin, specialization; agrees with EDA; `Explainer.explain_one(lead)` returns probability + top reasons up / down. |
