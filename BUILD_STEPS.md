@@ -101,12 +101,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 
 ## Phase 2 — Build Models (Week 2)
 
-### 2.1 Preprocessing & feature pipeline — *Stage 5*
-- [ ] `sklearn` `Pipeline` + `ColumnTransformer`: scale numerics, one-hot categoricals (missing values are already filled in `clean.py`).
-- [ ] Rare-category grouping (`__other__`) using `rare_category_min_share`; unknown categories handled at inference.
-- [ ] Engineered features from EDA findings.
-- [ ] Tests: pipeline fits/transforms, handles missing and unseen categories.
-- **Files:** `src/apex/data/features.py`, `tests/test_features.py`, `Makefile`
+### 2.1 Preprocessing & feature pipeline — *Stage 5* ✅
+- [x] `sklearn` `Pipeline` + `ColumnTransformer`: scale numerics, one-hot categoricals (missing values are already filled in `clean.py`).
+- [x] Rare-category grouping using `rare_category_min_share` (`OneHotEncoder` infrequent column); unseen categories go to the same column at inference.
+- [x] Engineered features from EDA findings.
+- [x] Tests: pipeline fits/transforms, handles missing and unseen categories.
+- **Files:** `src/apex/data/features.py`, `tests/test_features.py`, `docs/features.md`, `config.json`, `Makefile`
 - **Done when:** one pipeline object goes from raw rows to model-ready features, and it is fitted on training data only.
 
 ### 2.2 Stratified splits — *Stage 6*
@@ -245,3 +245,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | — | Full cleaning: missing values filled (`"Missing"`, fixed medians), `How did you hear…` dropped (78.5% empty), outliers capped (30 / 15), `Country` → India / Other, integer types, logic check; `docs/data_cleaning.md`, ADR-002; cleaned data → 9,240 × 13, 0 nulls. |
 | 2026-10-05 | — | Removed `data/interim/` and `data/processed/`: cleaning runs in memory with `clean(load_raw())`; `make preprocess` removed. |
 | 2026-10-05 | 1.5 | EDA (`make eda`): time on site is the strongest numeric (14% → 69%), visits/page views flat; Lead Add Form 92.5%, Working Professional 92%, occupation missing 14%; "what matters most" duplicates occupation missingness; 7 feature ideas for 2.1 in `docs/eda.md`. |
+| 2026-10-05 | 2.1 | Feature pipeline (`make features`): clean → `time_per_visit`, `has_web_activity`, drop "what matters most" → scale + one-hot (rare/unseen → infrequent); 36 raw columns → 51 features; quick CV PR-AUC 0.810 → 0.816. |

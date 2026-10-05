@@ -324,6 +324,7 @@ aurynix-apex/
 │   ├── data_quality.md            # data quality findings & decisions
 │   ├── data_cleaning.md           # cleaning steps & why
 │   ├── eda.md                     # EDA findings & feature ideas
+│   ├── features.md                # feature pipeline & decisions
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md
@@ -416,6 +417,7 @@ Run `make help` for the full list.
 | | `make data-info` | Print shape, hash, and target rate of the raw data |
 | | `make leakage` | Compare a quick model with and without leakage suspects |
 | | `make eda` | Print EDA tables and save figures to `reports/figures/` |
+| | `make features` | Fit the feature pipeline and list the features |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
@@ -436,15 +438,15 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 ## Roadmap
 
 ### Week 1: Understand & Explore
-- [ ] Project setup (structure, environment, tooling)
-- [ ] Problem framing document
-- [ ] Download and inspect the dataset
-- [ ] Data quality checks and cleaning
-- [ ] Leakage audit and data dictionary
-- [ ] EDA report
+- [x] Project setup (structure, environment, tooling)
+- [x] Problem framing document
+- [x] Download and inspect the dataset
+- [x] Data quality checks and cleaning
+- [x] Leakage audit and data dictionary
+- [x] EDA report
 
 ### Week 2: Build Models
-- [ ] Preprocessing and feature pipeline
+- [x] Preprocessing and feature pipeline
 - [ ] Stratified splits
 - [ ] Baselines (majority class, Logistic Regression)
 - [ ] Model comparison in MLflow

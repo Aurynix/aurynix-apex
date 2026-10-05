@@ -82,6 +82,9 @@
     },
     "rare_category_min_share": 0.01
   },
+  "features": {
+    "drop": ["What matters most to you in choosing a course"]
+  },
   "split": {
     "random_state": 42,
     "test_size": 0.2,
