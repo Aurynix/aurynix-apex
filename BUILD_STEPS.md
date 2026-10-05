@@ -78,7 +78,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [x] Class balance of `Converted`.
 - [x] Implement `clean.py`: replace placeholders with NaN, fix types, drop ID columns, standardize category labels.
 - [x] Unit tests for the cleaning functions.
-- **Files:** `notebooks/01_eda.ipynb`, `src/apex/data/clean.py`, `tests/test_clean.py`, `docs/data_quality.md`, `reports/figures/dq_*.png`
+- **Files:** `src/apex/data/clean.py`, `tests/test_clean.py`, `docs/data_quality.md`, `reports/figures/dq_*.png`
 - **Done when:** cleaning is a tested function (not notebook code) and every issue found has a documented decision.
 
 ### 1.4 Leakage audit — *Stage 4*
@@ -94,7 +94,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Correlations and redundant features.
 - [ ] Save key figures to `reports/figures/`.
 - [ ] Write findings and the resulting feature ideas.
-- **Files:** `notebooks/01_eda.ipynb`, `reports/figures/`
+- **Files:** `docs/eda.md`, `reports/figures/`
 - **Done when:** there is a clear list of findings that drive feature engineering.
 
 ---
@@ -122,14 +122,14 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Logistic Regression on the full pipeline.
 - [ ] Implement `evaluate.py`: PR-AUC, ROC-AUC, Brier, lift/gain at top-k.
 - [ ] Set up MLflow tracking (`make mlflow-ui`).
-- **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`, `notebooks/02_modeling.ipynb`
+- **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`
 - **Done when:** baseline metrics are logged in MLflow and become the bar to beat.
 
 ### 2.4 Model comparison — *Stage 8*
 - [ ] Random Forest, XGBoost, LightGBM with sensible defaults.
 - [ ] Stratified K-fold CV in `cv.py`; `make cv`.
 - [ ] Comparison table (mean ± std per metric) from MLflow.
-- **Files:** `src/apex/models/cv.py`, `notebooks/02_modeling.ipynb`
+- **Files:** `src/apex/models/cv.py`
 - **Done when:** every candidate is compared on the same folds and logged in MLflow.
 
 ### 2.5 Imbalance handling & tuning — *Stage 9*
@@ -167,7 +167,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Global SHAP: summary plot and feature-importance ranking.
 - [ ] Per-lead SHAP: top positive and negative contributors, mapped back to readable feature names.
 - [ ] Sanity check: explanations agree with the EDA findings.
-- **Files:** `src/apex/models/explain.py`, `notebooks/03_explainability.ipynb`, `reports/figures/`
+- **Files:** `src/apex/models/explain.py`, `reports/figures/`
 - **Done when:** `explain_one(lead)` returns readable top reasons.
 
 ### 3.5 Training artifacts
@@ -241,3 +241,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-02 | 1.1 | Problem framing: prediction moment, capacity-based segments, business + ML success criteria, risks. |
 | 2026-10-02 | 1.2 | Kaggle download (`make data-download`), loader, source record: 9,240 × 37, conversion rate 38.54%. |
 | 2026-10-02 | 1.3 | Data quality: `"Select"` hides up to 54.6% missing per column; missingness is informative (kept); 12 constant/near-constant columns dropped; stateless `clean.py` → 9,240 × 23; leakage suspects flagged for 1.4. |
+| 2026-10-05 | — | Notebooks removed from the repo; `notebooks/` is now git-ignored local scratch for testing. All code lives in `src/` and `tests/`. |

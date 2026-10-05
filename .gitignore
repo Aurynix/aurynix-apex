@@ -67,6 +67,8 @@ htmlcov/
 coverage.xml
 
 # ---------- Jupyter ----------
+# Notebooks are local scratch for testing; all real code lives in src/ and tests/.
+notebooks/
 .ipynb_checkpoints/
 
 # ---------- Streamlit ----------
