@@ -29,6 +29,7 @@ It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-puls
 - [System Architecture](#system-architecture)
 - [ML Pipeline](#ml-pipeline)
 - [Data Leakage Policy](#data-leakage-policy)
+- [Results](#results)
 - [Evaluation Strategy](#evaluation-strategy)
 - [Lead Segmentation](#lead-segmentation)
 - [Explainability](#explainability)
@@ -172,6 +173,27 @@ If not, it is removed and documented. Candidate leakage columns to verify:
 | `Last Notable Activity` | May include post-contact activity | To be verified |
 
 A model that suddenly scores 95%+ is treated as a leakage warning, not a success.
+
+## Results
+
+Final model: **Logistic Regression** on 24 features built from 7 raw lead fields ([ADR-003](docs/decisions.md), [ADR-004](docs/decisions.md)). Fitted on train + validation (7,392 leads) and evaluated **once** on the held-out test set (1,848 leads, step 3.1).
+
+| Metric | No skill | **Test** | Target |
+|---|---|---|---|
+| PR-AUC | 0.385 | **0.787** (95% CI 0.756–0.816) | far above no skill ✅ |
+| ROC-AUC | 0.500 | **0.855** | < 0.95 (no leakage alarm) ✅ |
+| Brier score | 0.237 | **0.149** | below no skill ✅ |
+| Buyers found in the top 20% (recall) | 20% | **43.3%** (lift 2.16) | ≥ 40% ✅ |
+| Calls that reach a buyer in the top 20% (precision) | 38.5% | **83.2%** | — |
+| Buyers found in the top 50% (recall) | 50% | **85.4%** | ≥ 80% ✅ |
+
+**In plain words:** if the sales team calls only the top-scored 20% of new leads, more than 8 in 10 calls reach a future customer, and those calls find 43% of all customers. Calling at random reaches fewer than 4 in 10 and finds 20%.
+
+![Test evaluation](reports/figures/test_evaluation.png)
+
+The test score is lower than validation (0.839) and cross-validation (0.818 ± 0.011). The test leads have the same mix as the other splits, and the 95% intervals of validation and test meet near the CV average, so this is sampling variation; the expected PR-AUC on new leads is about **0.80 ± 0.03**. Details: [docs/models.md](docs/models.md).
+
+---
 
 ## Evaluation Strategy
 
@@ -425,6 +447,7 @@ Run `make help` for the full list.
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
 | | `make tune` | Grid search over `C` and class weights, logged to MLflow |
+| | `make evaluate` | Retrain on train + val, score the test set once, save figure |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -458,7 +481,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Tuning (`C`, class weights)
 
 ### Week 3: Evaluate & Explain
-- [ ] Final test-set evaluation
+- [x] Final test-set evaluation
 - [ ] Probability calibration
 - [ ] High / Medium / Low segmentation
 - [ ] SHAP explainability

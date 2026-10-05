@@ -140,3 +140,39 @@ What it shows:
 | C = 1, balanced | 0.839 | 0.136 | 0.461 | 76.7% / 76.8% | 45.9% |
 
 **Choice: `C = 1`, no class weights** (`config.json → model`, [ADR-004](decisions.md)). It ties for the best ranking, and its probabilities stay honest: on average it predicts 39.3% for a group that converts at 38.5%. The default settings were already the best, so the tuned model equals the step 2.4 model: **validation PR-AUC 0.839, 88.7% precision and 46.1% recall in the top 20%**.
+
+## Step 3.1: Final test evaluation
+
+```bash
+make evaluate   # retrain on train + validation (7,392 leads), score the test set (1,848 leads) once
+```
+
+The final model (`C = 1`, no class weights, 24 features) is refitted on train + validation, then scores the test split. **This is the only time the test split is used**; nothing is changed after seeing it.
+
+| Metric | No skill | CV (train) | Validation | **Test** |
+|---|---|---|---|---|
+| PR-AUC | 0.385 | 0.818 ± 0.011 | 0.839 | **0.787** |
+| ROC-AUC | 0.500 | 0.869 | 0.887 | **0.855** |
+| Brier | 0.237 | 0.140 | 0.130 | **0.149** |
+| Precision top 20% | 38.5% | 85.7% | 88.7% | **83.2%** |
+| Recall top 20% | 20% | 44.5% | 46.1% | **43.3%** |
+| Lift top 20% | 1.0 | 2.22 | 2.30 | **2.16** |
+| Precision top 50% | 38.5% | — | 67.3% | **65.8%** |
+| Recall top 50% | 50% | — | 87.4% | **85.4%** |
+| Precision / recall at 0.5 | — | 80.3% / 67.2% | 80.8% / 70.4% | **76.7% / 65.2%** |
+
+**Targets** ([problem_framing.md](problem_framing.md) section 5): recall top 20% ≥ 40% ✅ (43.3%), recall top 50% ≥ 80% ✅ (85.4%), Brier below no skill ✅, no leakage alarm (ROC-AUC < 0.95) ✅.
+
+![Test evaluation](../reports/figures/test_evaluation.png)
+
+### Why the test score is lower
+
+Test PR-AUC (0.787) is below validation (0.839) and the CV average (0.818). Checks made **after** the test run, without changing the model:
+
+| Check | Result |
+|---|---|
+| 95% bootstrap interval (1,000 resamples) | Test **0.756–0.816**, validation 0.815–0.864: the CV average sits where they meet |
+| Lead mix | Same in all splits: Landing Page 52–54%, API 38–39%, Lead Add Form 7.6–8.1%; occupation missing 29–30% |
+| Where the gap is | Mostly Landing Page Submission leads: PR-AUC 0.737 on test vs. 0.811 on validation |
+
+Conclusion: validation was a slightly easy sample and test a slightly hard one. The best estimate for new leads is **PR-AUC ≈ 0.80 ± 0.03**, with the top 20% finding about 43–46% of buyers. The test numbers above are the ones reported.
