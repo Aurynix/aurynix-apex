@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage preprocess train cv predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage train cv predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -32,9 +32,6 @@ data-info: ## Print shape, hash, and target rate of data/raw/Leads.csv
 leakage: ## Compare a quick model with and without leakage suspects
 	$(RUN) python -m apex.data.leakage
 
-preprocess: ## Clean data (features are added in step 2.1)
-	$(RUN) python -m apex.data.clean
-
 train: ## Train model, save artifacts and reference profile
 	$(todo)
 
@@ -44,7 +41,7 @@ cv: ## Cross-validation
 predict: ## Offline batch scoring
 	$(todo)
 
-pipeline: preprocess train ## preprocess + train
+pipeline: train ## Full pipeline (cleaning runs inside train)
 
 # ---------- Serving ----------
 run: ## Start the API (dev, auto-reload)

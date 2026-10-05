@@ -25,7 +25,7 @@ Every issue found below has a **decision** with a reason. The cleaning rules liv
 | 12 | Rare categories | e.g. 21 `Lead Source` values, many with < 10 rows | `Country` → India / Other in `clean.py`; others grouped in step 2.1 (fitted on train) | `clean.py`, step 2.1 |
 | 13 | Leakage suspects | see below | 9 columns dropped (step 1.4, ADR-001) | `clean.py` |
 
-**Result:** `data/interim/leads_clean.parquet`, 9,240 rows × 23 columns (no rows removed); 13 columns and no missing values after the leakage audit (step 1.4) and the cleaning in [data_cleaning.md](data_cleaning.md).
+**Result:** `clean(load_raw())`, 9,240 rows × 23 columns (no rows removed); 13 columns and no missing values after the leakage audit (step 1.4) and the cleaning in [data_cleaning.md](data_cleaning.md).
 
 ---
 
