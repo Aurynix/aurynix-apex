@@ -23,9 +23,9 @@ Every issue found below has a **decision** with a reason. The cleaning rules liv
 | 10 | Outliers in `TotalVisits`, `Page Views Per Visit` | max 251 and 55 visits | **Keep rows**; cap in step 2.1 (fitted on train) | Step 2.1 |
 | 11 | Rows identical except for IDs | 1,489 rows in 193 groups | **Keep**; they are different leads | — |
 | 12 | Rare categories | e.g. 21 `Lead Source` values, many with < 10 rows | Group in step 2.1 (fitted on train) | Step 2.1 |
-| 13 | Leakage suspects | see below | Decide in step 1.4 | Step 1.4 |
+| 13 | Leakage suspects | see below | 9 columns dropped (step 1.4, ADR-001) | `clean.py` |
 
-**Result:** `data/interim/leads_clean.parquet`, 9,240 rows × 23 columns (no rows removed).
+**Result:** `data/interim/leads_clean.parquet`, 9,240 rows × 23 columns (no rows removed); 14 columns after the leakage columns are dropped in step 1.4.
 
 ---
 
@@ -122,4 +122,4 @@ Found during quality checks. Not decided here.
 | `numeric_columns` | `TotalVisits`, `Total Time Spent on Website`, `Page Views Per Visit` (validated ≥ 0) |
 | `drop_columns` | 12 constant / near-constant columns (section 2) |
 | `id_columns` | `Prospect ID`, `Lead Number` |
-| `leakage_columns` | empty, filled in step 1.4 |
+| `leakage_columns` | 9 post-contact columns, see [data_dictionary.md](data_dictionary.md) section 2 |

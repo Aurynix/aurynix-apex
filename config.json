@@ -58,7 +58,17 @@
       "Digital Advertisement",
       "Through Recommendations"
     ],
-    "leakage_columns": [],
+    "leakage_columns": [
+      "Tags",
+      "Lead Quality",
+      "Last Activity",
+      "Last Notable Activity",
+      "Lead Profile",
+      "Asymmetrique Activity Index",
+      "Asymmetrique Profile Index",
+      "Asymmetrique Activity Score",
+      "Asymmetrique Profile Score"
+    ],
     "rare_category_min_share": 0.01
   },
   "split": {
