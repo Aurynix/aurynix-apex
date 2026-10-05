@@ -8,15 +8,20 @@ Commands:
     python -m apex.models.train baselines   # step 2.3: train → validation (`make baselines`)
     python -m apex.models.train test        # step 3.1: train + val → test, ONCE (`make evaluate`)
     python -m apex.models.train calibration # step 3.2: calibration check (`make calibration`)
+    python -m apex.models.train final       # step 3.5: save the final model (`make train`)
 
 Then `make mlflow-ui` to browse the runs.
 """
 
+import json
 import sys
+from datetime import UTC, datetime
 from typing import Any
 
+import joblib
 import mlflow
 import pandas as pd
+import sklearn
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
@@ -25,6 +30,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 
 from apex.config import load_config, path
 from apex.data.features import build_pipeline
+from apex.data.load import file_sha256, load_raw, raw_leads_path
 from apex.data.split import load_splits
 from apex.models.evaluate import calibration_table, evaluate, plot_calibration, plot_test_report
 
@@ -76,7 +82,8 @@ def fit_and_log(name: str, model: Pipeline, parts: dict[str, pd.DataFrame], targ
 def _params(model: Pipeline) -> dict[str, Any]:
     """Main settings of the final estimator, for MLflow."""
     keep = ("C", "penalty", "class_weight", "solver", "max_iter", "strategy")
-    return {k: v for k, v in model[-1].get_params().items() if k in keep}
+    params = model[-1].get_params().items()
+    return {k: v for k, v in params if k in keep and v != "deprecated"}
 
 
 def run_baselines() -> pd.DataFrame:
@@ -170,7 +177,106 @@ def run_calibration() -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
+def run_final() -> dict[str, Any]:
+    """Step 3.5: fit the final model on all leads and save the four artifacts.
+
+    models/model.pkl              the fitted pipeline (raw lead → probability)
+    models/model_meta.json        for code: thresholds, features, metrics, explainer means
+    models/reference_profile.json for drift monitoring
+    models/model_card.json        for people: data, algorithm, performance, risks
+    """
+    from apex.models.card import build_card
+    from apex.models.explain import Explainer
+    from apex.models.segment import assign, segment_table, thresholds
+    from apex.monitoring.reference import build_profile
+
+    cfg = load_config()
+    target = cfg["data"]["target"]
+    raw = load_raw()
+    X, y = raw.drop(columns=[target]), raw[target]
+
+    # Performance: reproduce the step 3.1 test result, and out-of-fold scores on all rows.
+    parts = load_splits(raw, include_test=True)
+    fit = pd.concat([parts["train"], parts["val"]])
+    test_model = make_model(cfg).fit(fit.drop(columns=[target]), fit[target])
+    test_scores = test_model.predict_proba(parts["test"].drop(columns=[target]))[:, 1]
+    oof = out_of_fold_scores(make_model(cfg), X, y, cfg)
+
+    # Segments: thresholds from out-of-fold scores (scores on leads the model did not see).
+    cutoffs = thresholds(oof, cfg)
+    segments = assign(oof, cutoffs)
+
+    model = make_model(cfg).fit(X, y)
+    explainer = Explainer.fit(model, X)
+    model_inputs = list(model[0][-1].get_feature_names_out())
+
+    meta = {
+        "model_version": cfg["project"]["model_version"],
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "sklearn_version": sklearn.__version__,
+        "data": {
+            "file": raw_leads_path().name,
+            "sha256": file_sha256(raw_leads_path()),
+            "rows": len(raw),
+            "raw_columns": raw.shape[1],
+            "conversion_rate": round(float(y.mean()), 4),
+        },
+        "input_fields": cfg["serving"]["input_fields"],
+        "model_inputs": model_inputs,
+        "hyperparameters": _params(model),
+        "segments": {
+            "shares": cfg["segmentation"],
+            "thresholds": {k: round(v, 4) for k, v in cutoffs.items()},
+            "table": segment_table(y, segments).round(4).to_dict(orient="index"),
+        },
+        "performance": {
+            "test": evaluate(parts["test"][target], test_scores),
+            "out_of_fold_all": evaluate(y, oof),
+        },
+        "explainer_means": dict(zip(model_inputs, explainer.means.round(6).tolist(), strict=True)),
+    }
+    profile = build_profile(raw, model[0][:-1].transform(X), oof, segments, cfg)
+    card = build_card(meta, cfg)
+
+    out = path("models_dir")
+    out.mkdir(parents=True, exist_ok=True)
+    files = cfg["files"]
+    joblib.dump(model, out / files["model"])
+    for key, content in [
+        ("model_meta", meta),
+        ("reference_profile", profile),
+        ("model_card", card),
+    ]:
+        with (out / files[key]).open("w", encoding="utf-8") as f:
+            json.dump(content, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+
+    mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
+    mlflow.set_experiment(EXPERIMENT)
+    with mlflow.start_run(run_name=f"final_{meta['model_version']}"):
+        mlflow.log_params({"model": "logistic_regression", "fit_rows": len(X), **_params(model)})
+        mlflow.log_metrics({f"test_{k}": v for k, v in meta["performance"]["test"].items()})
+        mlflow.log_metrics(
+            {f"oof_{k}": v for k, v in meta["performance"]["out_of_fold_all"].items()}
+        )
+        for key in ("model_meta", "reference_profile", "model_card"):
+            mlflow.log_artifact(str(out / files[key]))
+
+    print(f"Final model {meta['model_version']} fitted on all {len(X):,} leads")
+    print(f"Thresholds: High ≥ {cutoffs['high']:.3f}, Medium ≥ {cutoffs['medium']:.3f}")
+    print(f"Test PR-AUC {meta['performance']['test']['pr_auc']}, ", end="")
+    print(f"out-of-fold PR-AUC {meta['performance']['out_of_fold_all']['pr_auc']}\n")
+    for key in ("model", "model_meta", "reference_profile", "model_card"):
+        print(f"saved: {out / files[key]}")
+    return meta
+
+
 if __name__ == "__main__":
-    commands = {"baselines": run_baselines, "test": run_test, "calibration": run_calibration}
+    commands = {
+        "baselines": run_baselines,
+        "test": run_test,
+        "calibration": run_calibration,
+        "final": run_final,
+    }
     command = sys.argv[1] if len(sys.argv) > 1 else "baselines"
     commands[command]()

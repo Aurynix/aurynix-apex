@@ -309,3 +309,51 @@ No single field dominates, so the leakage alarm in [problem_framing.md](problem_
  "reasons_up": [{"feature": "Occupation", "value": "Working Professional", "impact": 2.48}, ...],
  "reasons_down": []}
 ```
+
+## Step 3.5: Training artifacts and model card
+
+```bash
+make train      # fit the final model on all 9,240 leads, save 4 files to models/
+make predict    # score Leads.csv with the saved model → data/predictions.csv
+make pipeline   # split + train + predict, end to end from Leads.csv
+```
+
+The test split has done its job (step 3.1), so the **final model is fitted on all 9,240 leads**. Its expected performance is the step 3.1 test result, which `make train` reproduces (fit on train + validation, score test: PR-AUC 0.7874) and stores.
+
+| File | For | In git | Contents |
+|---|---|---|---|
+| `models/model.pkl` | API, batch scoring | no | The fitted pipeline: raw lead (7 fields) → probability |
+| `models/model_meta.json` | Code | no | Version, training date, data SHA-256, input fields, model inputs, settings, segment thresholds and table, test + out-of-fold metrics, explainer background means |
+| `models/reference_profile.json` | Drift monitoring (step 4.4) | no | Bin edges and shares per numeric input, category shares, raw missing rates, score distribution, segment shares |
+| `models/model_card.json` | People | **yes** | See below |
+
+**Final segment thresholds** (out-of-fold scores on all rows): High ≥ **0.746**, Medium ≥ **0.275**. They differ slightly from step 3.3 (0.751 / 0.270, from 7,392 rows) because they now use all 9,240 leads.
+
+### Model card
+
+[`models/model_card.json`](../models/model_card.json) is a JSON summary for anyone deciding whether to trust and use the model. It is rebuilt on every `make train` ([`card.py`](../src/apex/models/card.py)), so its numbers always match the saved model.
+
+| Section | What it answers |
+|---|---|
+| `model_details` | Name, version, training date, owner, license, task, related docs |
+| `intended_use` | Who uses it, when it scores, what it must **not** be used for (credit, hiring, post-contact scoring, other businesses without re-validation) |
+| `data` | Source, file hash, rows, conversion rate, splits, cleaning, removed leakage columns, known issues |
+| `features` | The 7 input fields, engineered features, no protected or location attributes |
+| `algorithm` | Pipeline, hyperparameters, why Logistic Regression, calibration, explanation method, segment thresholds |
+| `performance` | Test metrics, out-of-fold metrics, segment table, baseline, and which targets are met |
+| `risk_rating` | Overall rating with reasons, plus each risk with likelihood, impact, rating, and mitigation |
+| `limitations` | What the model cannot do well |
+| `monitoring` | PSI thresholds and when to retrain |
+
+**Risk rating: Low overall.** The model only supports sales prioritization: a person decides whom to call, Low leads still get automated emails, no protected or location attributes are used, and no one is denied a product or service. The main risks are about the model, not about people:
+
+| Risk | Likelihood | Impact | Rating |
+|---|---|---|---|
+| Data not representative (one company, one period) | High | Medium | Medium |
+| Hidden leakage via Lead Add Form (92.5% convert) | Medium | Medium | Medium |
+| Data and score drift | Medium | Medium | Medium |
+| Feedback loop (only High leads get called) | Medium | Low | Low |
+| Calibration bias in the 0.5–0.9 range | High | Low | Low |
+| Indirect bias through occupation | Medium | Low | Low |
+
+Each risk's mitigation is in the card.

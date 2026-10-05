@@ -13,6 +13,7 @@ data/raw/*
 # ---------- Model artifacts ----------
 models/*
 !models/.gitkeep
+!models/model_card.json
 *.pkl
 *.joblib
 *.onnx
