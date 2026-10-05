@@ -2,7 +2,7 @@
 
 > Surface the apex of your pipeline: predict which leads will convert, so sales teams call the right people first.
 
-![Status](https://img.shields.io/badge/status-in%20progress-orange)
+![Status](https://img.shields.io/badge/status-v0.1.0%20complete-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -16,7 +16,7 @@
 
 It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-pulse)**, an AI lead qualification platform.
 
-> 🚧 **Under active development.** This README describes the design and roadmap. Results and metrics will be added only after each stage is completed and validated.
+> ✅ **v0.1.0 complete.** All build steps are done ([BUILD_STEPS.md](BUILD_STEPS.md)). On a held-out test set, the top 20% of scored leads hold **43%** of all buyers, and **83%** of calls in that group reach a buyer (random: 38%). See [Results](#results).
 
 ---
 
@@ -121,41 +121,41 @@ For every lead it returns:
 ## System Architecture
 
 ```
-                         ┌──────────────────── Training ────────────────────┐
-  data/raw/Leads.csv ──▶ │ clean ─▶ features ─▶ train ─▶ evaluate ─▶ save   │
-                         └──────────────────────────────────────┬───────────┘
-                                                                │
-                              models/model.pkl                  │
-                              models/model_meta.json   ◀────────┤
-                              models/reference_profile.json ◀───┘
-                                       │
+                        ┌──────────────── Training (make pipeline) ────────────────┐
+ data/raw/Leads.csv ──▶ │ clean ─▶ features ─▶ split ─▶ train ─▶ evaluate ─▶ save  │
+                        └──────────────────────────────────────────────┬───────────┘
+                                                                       ▼
+                     models/  model.pkl · model_meta.json · reference_profile.json · model_card.json
+                                       │ (loaded once, read-only)
                                        ▼
-  Client / Pulse ──▶  FastAPI  ──▶  predict + segment + explain
-                         │
-                         ▼
-                 SQLite: predictions ──▶ monitor.py ──▶ drift_runs
-                                                    └──▶ feature_drift
-                                                    └──▶ reports/monitoring/*.html
+ Client / Pulse ──▶ FastAPI routers ──▶ ScoringService: score ─▶ segment ─▶ explain ─▶ log
+ Streamlit demo ──▶  (validate only)                                                 │
+                                                                                      ▼
+                     SQLite (data/apex.db): predictions · rejected_requests ──▶ Monitor
+                                                                                  │
+                                         drift_runs · reports/monitoring/latest.json ◀┘
 ```
+
+Training and serving are separate: the API only loads the saved model and never trains ([ADR-006](docs/decisions.md)).
 
 ## ML Pipeline
 
 | # | Stage | Key Activities | Output |
 |---|---|---|---|
-| 1 | **Problem Framing** | Define target, prediction moment, business success criteria | `docs/problem_framing.md` |
-| 2 | **Data Collection** | Download and document raw datasets | `data/raw/` |
-| 3 | **Data Quality & EDA** | Missing values, hidden nulls (`"Select"`), duplicates, outliers, class balance, feature–target relationships | EDA & Data Quality Report |
-| 4 | **Leakage Audit** | Classify every column as available or not available at lead creation | `docs/data_dictionary.md` |
-| 5 | **Preprocessing & Feature Engineering** | `sklearn` `Pipeline` + `ColumnTransformer`, rare-category grouping, engineered features | `src/apex/data/` |
-| 6 | **Data Splitting** | Stratified train / validation / test; test set used once | Fixed, seeded splits |
-| 7 | **Baseline** | Majority-class baseline and Logistic Regression | Baseline metrics |
-| 8 | **Cross-validation & Feature Selection** | Stratified 5-fold CV; keep the simplest feature set that scores the same; tracked in MLflow | Selected features |
-| 9 | **Tuning** | Grid search over Logistic Regression `C` and class weights, with cross-validation | Tuned model |
-| 10 | **Evaluation & Calibration** | PR-AUC, ROC-AUC, lift/gain, calibration curve, Brier score | Validation Report |
-| 11 | **Segmentation** | Map probabilities to High / Medium / Low using sales capacity | Segmentation Methodology |
-| 12 | **Explainability** | Global and per-lead SHAP explanations | Explainability Report |
-| 13 | **Serving** | FastAPI service, prediction logging, Docker, Streamlit demo | Live API & demo |
-| 14 | **Monitoring & Retraining** | Data drift and score drift (PSI), alerts, retraining entry point | Monitoring tables & reports |
+| 1 | **Problem Framing** | Define target, prediction moment, business success criteria | [problem_framing.md](docs/problem_framing.md) |
+| 2 | **Data Collection** | Download and document raw datasets | [data_dictionary.md](docs/data_dictionary.md) §1 |
+| 3 | **Data Quality & EDA** | Missing values, hidden nulls (`"Select"`), duplicates, outliers, class balance, feature–target relationships | [data_quality.md](docs/data_quality.md), [data_cleaning.md](docs/data_cleaning.md), [eda.md](docs/eda.md) |
+| 4 | **Leakage Audit** | Classify every column as available or not available at lead creation | [data_dictionary.md](docs/data_dictionary.md) §2, ADR-001 |
+| 5 | **Preprocessing & Feature Engineering** | `sklearn` `Pipeline` + `ColumnTransformer`, rare-category grouping, engineered features | [features.md](docs/features.md) |
+| 6 | **Data Splitting** | Stratified train / validation / test; test set used once | [splits.md](docs/splits.md) |
+| 7 | **Baseline** | Majority-class baseline and Logistic Regression | [models.md](docs/models.md) 2.3 |
+| 8 | **Cross-validation & Feature Selection** | Stratified 5-fold CV; keep the simplest feature set that scores the same; tracked in MLflow | [models.md](docs/models.md) 2.4 |
+| 9 | **Tuning** | Grid search over Logistic Regression `C` and class weights, with cross-validation | [models.md](docs/models.md) 2.5, ADR-004 |
+| 10 | **Evaluation & Calibration** | PR-AUC, ROC-AUC, lift/gain, calibration curve, Brier score | [models.md](docs/models.md) 3.1–3.2 |
+| 11 | **Segmentation** | Map probabilities to High / Medium / Low using sales capacity | [models.md](docs/models.md) 3.3 |
+| 12 | **Explainability** | Global and per-lead explanations (exact linear SHAP) | [models.md](docs/models.md) 3.4 |
+| 13 | **Serving** | FastAPI service, prediction logging, Docker, Streamlit demo | [api.md](docs/api.md), [deployment.md](docs/deployment.md) |
+| 14 | **Monitoring** | Feature drift, prediction drift (PSI), data quality; drift simulation | [monitoring.md](docs/monitoring.md) |
 
 ## Data Leakage Policy
 
@@ -163,14 +163,17 @@ Every feature must pass one test:
 
 > **Is this information available at the moment the lead is created, before any sales contact?**
 
-If not, it is removed and documented. Candidate leakage columns to verify:
+If not, it is removed and documented ([data_dictionary.md](docs/data_dictionary.md) §2, [ADR-001](docs/decisions.md)). Result of the audit:
 
-| Column | Risk | Status |
-|---|---|---|
-| `Tags` | Assigned by sales after contact | To be verified |
-| `Lead Quality` | Sales rep's judgment after contact | To be verified |
-| `Last Activity` | May include post-contact activity | To be verified |
-| `Last Notable Activity` | May include post-contact activity | To be verified |
+| Column | Why it leaks | Evidence (quick model, PR-AUC gain) | Status |
+|---|---|---|---|
+| `Tags` | Sales status after contact ("Closed by Horizzon", "Ringing") | **+0.148** | ❌ Removed |
+| `Lead Quality` | Sales rep's judgment of the lead | +0.061 | ❌ Removed |
+| `Last Activity`, `Last Notable Activity` | Activity at export time, incl. sales actions (`SMS Sent`) | +0.036 | ❌ Removed |
+| `Asymmetrique` index / score (4 columns) | Assigned scores, timing unknown | +0.022 | ❌ Removed |
+| `Lead Profile` | Assigned label ("Potential Lead") | +0.020 | ❌ Removed |
+| Website visits, time on site | Could include visits after contact (no timestamps) | smooth pattern, not a near-perfect split | ⚠️ Kept, risk documented |
+| `Lead Origin = Lead Add Form` | 92.5% convert; may be added by sales after a call | origin is known at creation | ⚠️ Kept, risk in model card |
 
 A model that suddenly scores 95%+ is treated as a leakage warning, not a success.
 
@@ -551,7 +554,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Reference profile at training time
 - [x] Data drift and score drift monitoring
 - [x] Docker and Streamlit demo
-- [ ] Final documentation
+- [x] Final documentation
 
 ### Later
 - [ ] `outcomes` table and live performance tracking
@@ -560,14 +563,25 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 
 ## Design Decisions
 
-Documented in `docs/decisions.md` as the project progresses. This section will answer:
+All decisions are recorded as ADRs in [docs/decisions.md](docs/decisions.md). The main questions, answered with evidence:
 
-- Why the final model was chosen over the alternatives
-- How data leakage was detected and prevented
-- How class imbalance was handled
-- How the model is shown to improve lead prioritization
-- How scores are used operationally by sales teams
-- How the model is monitored and when it is retrained
+**Why Logistic Regression over the alternatives?**
+On the same 51 features, 5-fold CV PR-AUC was 0.818 for Logistic Regression, HistGradientBoosting, and LightGBM, and 0.812 for XGBoost. With equal accuracy, the simpler model wins: one weight per feature that a sales rep can understand, honest probabilities without extra calibration, fast training and serving. Default settings (`C = 1`, no class weights) were already the best in a 14-setup grid. ([ADR-003](docs/decisions.md), [ADR-004](docs/decisions.md))
+
+**How was data leakage detected and prevented?**
+Every column was checked against the prediction moment (lead creation, before sales contact), using the publisher's column descriptions, conversion rates per value, and a with/without experiment: adding `Tags` alone raised PR-AUC from 0.804 to 0.952. Nine post-contact columns are dropped in cleaning (`config.json → data.leakage_columns`). The final model has ROC-AUC 0.855 (below the 0.95 leakage alarm), and no single field dominates its explanations. ([ADR-001](docs/decisions.md), [Data Leakage Policy](#data-leakage-policy))
+
+**How was class imbalance handled?**
+The imbalance is moderate (38.5% convert). PR-AUC is the main metric and lift / recall at the top 20% the business metric, so accuracy can't hide a weak ranking. `balanced` class weights were tested and rejected: same ranking (PR-AUC 0.8171 vs. 0.8176), but inflated probabilities (mean prediction 0.461 vs. an actual 0.385). Resampling was not needed for the same reason. ([ADR-004](docs/decisions.md))
+
+**How is the model shown to improve lead prioritization?**
+On a held-out test set used once (1,848 leads): calling the top 20% reaches **43.3%** of all buyers (random: 20%, best possible ≈ 52%), with **83.2%** of those calls reaching a buyer (random: 38.5%). High leads convert **7.1×** more often than Low leads (84.1% vs. 11.8%), and High + Medium (half the leads) hold **85%** of buyers. All targets set before modelling were met. ([Results](#results), [models.md](docs/models.md))
+
+**How are scores used by sales teams?**
+Every lead gets a probability, a segment based on team capacity (top 20% High: call today; next 30% Medium: this week; rest Low: automated email), and its top reasons in plain words ("Occupation = Working Professional", "3 visits, 20 min on site"). If capacity changes, only the shares in `config.json` change. Probabilities are calibrated within 0.031 on average. ([Lead Segmentation](#lead-segmentation), [Explainability](#explainability), [ADR-005](docs/decisions.md))
+
+**How is the model monitored, and when is it retrained?**
+Every prediction is logged. `make monitor` (or `POST /monitoring/run`) checks feature drift, prediction drift (score PSI and segment shares), and data quality against the training profile. A simulated "new campaign" is flagged (Lead Source PSI 2.54, High share 20% → 7%) while stable traffic is not. Retrain when the score or a key feature reaches PSI ≥ 0.25, when new sources or forms appear, or when real outcomes show the High segment converting less. The model card lists the risks and their mitigations. ([monitoring.md](docs/monitoring.md), [ADR-007](docs/decisions.md), [model card](models/model_card.json))
 
 ## Author
 

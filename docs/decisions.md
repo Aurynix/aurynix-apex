@@ -1,6 +1,18 @@
 # Architecture Decision Records
 
-Short records of decisions that shape the model. Newest last.
+Short records of decisions that shape the model and the system. Newest last.
+
+| ADR | Decision | Step |
+|---|---|---|
+| [001](#adr-001-drop-post-contact-columns-leakage) | Drop 9 post-contact columns (leakage) | 1.4 |
+| [002](#adr-002-fill-missing-values-and-cap-outliers-with-fixed-values-in-cleaning) | Fill missing values and cap outliers with fixed values in cleaning | data cleaning |
+| [003](#adr-003-logistic-regression-as-the-model) | Logistic Regression as the model | 2.3 |
+| [004](#adr-004-logistic-regression-settings-c--1-no-class-weights) | C = 1, no class weights | 2.5 |
+| [005](#adr-005-no-extra-calibration-keep-raw-logistic-regression-probabilities) | No extra calibration | 3.2 |
+| [006](#adr-006-api-thin-routers-one-scoring-service-no-training-in-the-api) | API: thin routers, one scoring service, no training in the API | 4.1 |
+| [007](#adr-007-drift-monitoring-with-own-psi-code-and-three-checks) | Drift monitoring with own PSI code and three checks | 4.4 |
+
+Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
 ---
 
@@ -90,3 +102,35 @@ Short records of decisions that shape the model. Newest last.
 **Why.** The raw model already meets the target (ECE ≤ 0.05) and its average prediction matches the actual rate. Isotonic is better calibrated but adds 5 models and a step function, makes explanations indirect, and lowers PR-AUC slightly, for a Brier gain of 0.0015. Platt adds nothing to a model that is already a sigmoid.
 
 **Consequences.** Known bias: 0.5–0.6 scores convert ~10 points more than predicted, 0.8–0.9 scores ~10 points less. Segments (step 3.3) use ranks, so they are not affected. If exact percentages become important in the product, switch to isotonic (one line in `make_model`).
+
+---
+
+## ADR-006: API: thin routers, one scoring service, no training in the API
+
+- **Date:** 2026-10-06 · **Step:** 4.1 (4.3 skipped) · **Status:** Accepted
+
+**Context.** The API must score leads, segment them, explain them, and log them. Training could also be exposed as an endpoint (`/pipeline/train`).
+
+**Decision.**
+- Routers only validate requests (Pydantic) and call one `ScoringService`, which does score → segment → explain → log.
+- At startup the API loads the saved artifacts once (`model.pkl`, `model_meta.json`). It **never trains**; training stays a separate workflow (`make train`). No training endpoint.
+- Reasons are part of every prediction; there is no separate explain endpoint.
+
+**Why.** One place for the logic (API, demo, and simulation use the same service), small routers, easy tests without a server, and a predictable API: its behavior changes only when a new model is trained and deployed on purpose. A training endpoint would add background jobs, status tracking, and model swapping for no current user need.
+
+**Consequences.** Retraining = `make train` + restart the API (in Docker, `models/` is mounted, so no rebuild). Revisit a training endpoint if retraining must be triggered from the product.
+
+---
+
+## ADR-007: Drift monitoring with own PSI code and three checks
+
+- **Date:** 2026-10-06 · **Step:** 4.4 · **Status:** Accepted
+
+**Context.** There are no conversion outcomes in production yet, so performance cannot be measured directly. Tools such as Evidently can produce drift reports.
+
+**Decision.** Compare recent predictions with the training reference profile in three checks: **feature drift** (PSI per model input, fixed training bins), **prediction drift** (score PSI and High / Medium / Low shares), and **data quality** (missing rates, unseen categories, leads relying on defaults, rejected requests). PSI is computed by a few lines of own code; results go to SQLite and a JSON report. No Evidently.
+
+**Why.** PSI is simple, explainable, and enough for these inputs. Own code avoids a large dependency and keeps the numbers in the API and the demo. Evidence: the simulation flags a "new campaign" shift (Lead Source PSI 2.54, High share 20% → 7%) and does not flag stable traffic (all PSI ≤ 0.02) ([monitoring.md](monitoring.md)).
+
+**Consequences.** Drift says the data changed, not that the model is wrong. When outcomes arrive, add an `outcomes` table and track live precision of the High segment.
+

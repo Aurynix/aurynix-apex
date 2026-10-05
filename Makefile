@@ -8,9 +8,6 @@ API_PORT ?= 8000
 DEMO_PORT ?= 8501
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-# Placeholder for targets whose stage is not implemented yet.
-todo = @echo "⏳ '$@' is not implemented yet (see BUILD_STEPS.md)."
-
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'

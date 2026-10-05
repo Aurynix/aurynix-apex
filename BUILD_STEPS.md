@@ -215,9 +215,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `Dockerfile`, `docker-compose.yml`, `.env.example`, `app/demo.py`, `tests/test_demo.py`, `docs/deployment.md`, `Makefile`, `README.md`
 - **Done when:** a fresh machine can run the API and demo from the README instructions.
 
-### 4.6 Final documentation
-- [ ] `docs/api.md`, `docs/deployment.md`, complete `docs/decisions.md`.
-- [ ] README: fill in results, figures, segment table; tick roadmap boxes; update status badge.
+### 4.6 Final documentation ✅
+- [x] `docs/api.md`, `docs/deployment.md`, `docs/monitoring.md`; `docs/decisions.md` completed (index + ADR-006 API design, ADR-007 monitoring).
+- [x] README: status badge and note, architecture diagram, pipeline table linked to docs, leakage audit results, results / figures / segment table, roadmap ticked.
+- [x] README "Design Decisions": all six questions answered with evidence and ADR links.
+- [x] `problem_framing.md` open questions closed; unused `todo` placeholder removed from the Makefile; all relative doc links checked.
+- **Files:** `README.md`, `docs/decisions.md`, `docs/problem_framing.md`, `BUILD_STEPS.md`, `Makefile`
 - **Done when:** the README's "Design Decisions" questions are all answered with evidence.
 
 ---
@@ -260,3 +263,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 4.3 | Skipped: training stays `make train`; the API never trains. |
 | 2026-10-06 | 4.4 | Drift monitoring (`make monitor`, `/monitoring/*`): feature drift (PSI), prediction drift (score PSI + segment shares), data quality (missing, unseen, defaults, rejected requests). Simulation (`make drift-demo`): stable → ok (all PSI ≤ 0.02); new-campaign shift → drift (Lead Source 2.54, time on site 1.31, High 20% → 7%). Tests no longer need saved artifacts (shared synthetic fixtures). 92 tests. |
 | 2026-10-06 | 4.5 | Docker (API + Streamlit demo, one image, `models/` mounted read-only, API health check, configurable ports) and `app/demo.py` (API client: score a lead, score a CSV, monitoring). Image 6.27 GB → 3.51 GB by keeping the uv cache out of it. Checked with the real stack in Docker. |
+| 2026-10-06 | 4.6 | Final documentation: README answers every design question with evidence; ADR-006 (API design), ADR-007 (monitoring); open questions closed. **v0.1.0 complete.** |

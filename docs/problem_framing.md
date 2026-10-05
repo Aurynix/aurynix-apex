@@ -120,6 +120,6 @@ The main question: **what share of all conversions lands in the High segment?**
 
 ## 10. Open questions
 
-- [ ] Confirm the conversion rate and row count (step 1.2).
-- [ ] Which activity columns pass the prediction-moment test (step 1.4)?
-- [ ] Do the provisional business targets in 5.1 hold up against the baseline (step 2.3)?
+- [x] Confirm the conversion rate and row count (step 1.2): 9,240 leads, 38.54% converted ([data_dictionary.md](data_dictionary.md)).
+- [x] Which activity columns pass the prediction-moment test (step 1.4)? Website visits and time on site are kept (with a documented risk); `Last Activity`, `Last Notable Activity`, `Tags`, `Lead Quality`, `Lead Profile`, and the `Asymmetrique` scores are removed ([ADR-001](decisions.md)).
+- [x] Do the provisional business targets in 5.1 hold up? Yes, all met on the held-out test set: 43.3% of conversions in the top 20% (target ≥ 40%), 85.4% in the top 50% (≥ 80%), High converts 7.1× more than Low (≥ 3×) ([models.md](models.md) steps 3.1 and 3.3).
