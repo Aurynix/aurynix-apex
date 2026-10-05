@@ -26,10 +26,13 @@ EXPERIMENT = "apex-lead-scoring"
 
 
 def make_model(config: dict[str, Any] | None = None, **params: Any) -> Pipeline:
-    """Feature pipeline + Logistic Regression (extra params go to the regression)."""
+    """Feature pipeline + Logistic Regression.
+
+    Settings come from `config.json → model` (chosen in step 2.5); extra params override them.
+    """
     cfg = config or load_config()
     model = LogisticRegression(max_iter=1000, random_state=cfg["split"]["random_state"])
-    return make_pipeline(build_pipeline(cfg), model.set_params(**params))
+    return make_pipeline(build_pipeline(cfg), model.set_params(**{**cfg["model"], **params}))
 
 
 def make_baselines(config: dict[str, Any] | None = None) -> dict[str, Pipeline]:

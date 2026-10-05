@@ -132,11 +132,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/cv.py`, `tests/test_cv.py`, `src/apex/data/features.py`, `config.json`, `docs/models.md`, `docs/features.md`
 - **Done when:** the selected features are justified by CV mean ± std and logged in MLflow.
 
-### 2.5 Tuning — *Stage 9*
-- [ ] Grid search over Logistic Regression settings with CV on the train split: regularization strength `C`, `class_weight` (none vs. balanced).
-- [ ] Confirm the best settings on the validation split.
-- [ ] Record the choice in `docs/decisions.md`.
-- **Files:** `src/apex/models/cv.py`, `src/apex/models/train.py`, `docs/decisions.md`
+### 2.5 Tuning — *Stage 9* ✅
+- [x] Grid search over Logistic Regression settings with CV on the train split: regularization strength `C`, `class_weight` (none vs. balanced).
+- [x] Confirm the best settings on the validation split.
+- [x] Record the choice in `docs/decisions.md`.
+- **Files:** `src/apex/models/cv.py`, `src/apex/models/train.py`, `config.json`, `tests/test_cv.py`, `docs/models.md`, `docs/decisions.md` (ADR-004), `Makefile`
 - **Done when:** the tuned model is at least as good as the baseline on validation, and the choice is justified in an ADR.
 
 ---
@@ -250,3 +250,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | 2.2 | Stratified 60/20/20 split (`make split`) saved as `data/splits.csv`; conversion 38.5% in every split; `load_splits()` hides test unless `include_test=True`; 22% of val/test leads have a look-alike in train (kept, documented). |
 | 2026-10-06 | 2.3 | Baselines (`make baselines`, MLflow on SQLite): no skill PR-AUC 0.385 vs. Logistic Regression **0.840** on validation; top 20% captures 46.2% of buyers (target ≥ 40%), top 50% 87.4%; LR chosen as the model (ADR-003). |
 | 2026-10-06 | 2.4 | Plan changed for Logistic Regression (ADR-003). 5-fold CV on train (`make cv`): selected features (24) give the same PR-AUC as all features (51), 0.8176 ± 0.011; dropped `Page Views Per Visit`, `City`, `Country`, free-book flag; `Specialization` → Given / Missing. Validation PR-AUC 0.839. |
+| 2026-10-06 | 2.5 | Tuning (`make tune`, 14 setups): `C` 0.3–10 is a plateau (CV PR-AUC ≈ 0.817); `balanced` class weights do not improve ranking and inflate probabilities (val mean 0.461 vs. 0.385). Kept `C = 1`, no class weights (ADR-004, `config.json → model`); validation PR-AUC 0.839. |

@@ -93,6 +93,10 @@
     ],
     "presence_only": ["Specialization"]
   },
+  "model": {
+    "C": 1.0,
+    "class_weight": null
+  },
   "split": {
     "random_state": 42,
     "test_size": 0.2,

@@ -27,3 +27,25 @@ def test_all_features_undoes_feature_selection_only():
     assert full["features"]["drop"] == ["What matters most to you in choosing a course"]
     assert full["features"]["presence_only"] == []
     assert len(cfg["features"]["drop"]) > 1  # the original config is not changed
+
+
+def test_tune_tries_every_combination_best_first(tmp_path, monkeypatch):
+    import mlflow
+
+    from apex.models import cv
+
+    mlflow.set_tracking_uri(f"sqlite:///{tmp_path / 'mlflow.db'}")
+    mlflow.set_experiment("test")
+    monkeypatch.setattr(cv, "GRID", {"C": [0.01, 1.0], "class_weight": [None, "balanced"]})
+
+    rng = np.random.default_rng(0)
+    time = rng.integers(0, 2000, 200)
+    X = pd.DataFrame(
+        {"TotalVisits": rng.integers(1, 6, 200).astype(float), "Total Time Spent on Website": time}
+    )
+    y = pd.Series((time > 1000).astype(int))
+
+    table = cv.tune(X, y, load_config())
+    assert len(table) == 4
+    assert table["pr_auc"].is_monotonic_decreasing
+    assert set(table["class_weight"]) == {"none", "balanced"}

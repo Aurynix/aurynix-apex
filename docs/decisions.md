@@ -54,3 +54,19 @@ Short records of decisions that shape the model. Newest last.
 **Why.** Same accuracy, and simpler: one weight per feature that a sales rep can understand, probabilities that are close to calibrated without extra steps, fast training and serving. The data is small (5,544 training leads) and the main signals add up independently (Lead Add Form, occupation, time on site), which is what a linear model captures.
 
 **Consequences.** Model work focuses on Logistic Regression settings (regularization strength `C`, class weights) rather than comparing model families. Validation baseline: PR-AUC 0.840, 46.2% of buyers in the top 20% ([models.md](models.md)).
+
+---
+
+## ADR-004: Logistic Regression settings: C = 1, no class weights
+
+- **Date:** 2026-10-06 · **Step:** 2.5 · **Status:** Accepted
+
+**Context.** Grid search with 5-fold CV on the train split: `C` ∈ {0.01, 0.03, 0.1, 0.3, 1, 3, 10} × `class_weight` ∈ {none, balanced}. Imbalance is moderate (38.5% buyers).
+
+**Decision.** `C = 1.0`, `class_weight = none`, stored in `config.json → model`.
+
+**Why.**
+- `C` from 0.3 to 10 gives the same PR-AUC (0.8165–0.8177, std ≈ 0.011); `C = 1` sits in the middle of that plateau and has the best ROC-AUC. Strong regularization (`C` ≤ 0.1) clearly hurts.
+- `balanced` class weights leave the ranking unchanged (0.8171 vs. 0.8176) but inflate probabilities (validation mean prediction 0.461 vs. actual 0.385; Brier 0.136 vs. 0.130). Segments are cut by share of leads, not by probability, so class weights bring no benefit, and calibrated probabilities are needed (step 3.2).
+
+**Consequences.** The tuned model is the default Logistic Regression: validation PR-AUC 0.839. Resampling (e.g. SMOTE) is not tried: if reweighting the classes does not change the ranking, resampling, which has a similar effect, is unlikely to.

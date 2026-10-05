@@ -424,6 +424,7 @@ Run `make help` for the full list.
 | | `make baselines` | Fit no-skill + Logistic Regression, log to MLflow |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
+| | `make tune` | Grid search over `C` and class weights, logged to MLflow |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -454,7 +455,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Stratified splits
 - [x] Baselines (majority class, Logistic Regression)
 - [x] Cross-validation and feature selection
-- [ ] Tuning (`C`, class weights)
+- [x] Tuning (`C`, class weights)
 
 ### Week 3: Evaluate & Explain
 - [ ] Final test-set evaluation
