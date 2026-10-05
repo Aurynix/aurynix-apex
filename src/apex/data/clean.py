@@ -8,16 +8,15 @@ Steps, in order: normalize text → placeholders to missing → merge spellings 
 Yes/No to 1/0 → drop columns → group rare values → validate → fill missing →
 fix types → cap outliers. Each step is explained in docs/data_cleaning.md.
 
-Run `python -m apex.data.clean` (or `make preprocess`) to write
-data/interim/leads_clean.parquet (name set in config.json → files).
+There is no saved copy of the cleaned data: cleaning takes under a second, so
+every stage calls `clean(load_raw())` and always gets the current rules.
 """
 
 from typing import Any
 
 import pandas as pd
 
-from apex.config import load_config, path
-from apex.data.load import load_raw
+from apex.config import load_config
 
 YES_NO = {"Yes": 1, "No": 0}
 
@@ -125,17 +124,3 @@ def clean(df: pd.DataFrame, config: dict[str, Any] | None = None) -> pd.DataFram
             df[col] = df[col].astype(int)
     df = cap_outliers(df, cfg["caps"])
     return df
-
-
-def run() -> pd.DataFrame:
-    """Load the raw file, clean it, and save it to data/interim/."""
-    df = clean(load_raw())
-    out = path("interim_dir") / load_config()["files"]["interim_leads"]
-    out.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(out, index=False)
-    print(f"saved: {out} ({df.shape[0]} rows × {df.shape[1]} columns)")
-    return df
-
-
-if __name__ == "__main__":
-    run()

@@ -105,7 +105,6 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] `sklearn` `Pipeline` + `ColumnTransformer`: scale numerics, one-hot categoricals (missing values are already filled in `clean.py`).
 - [ ] Rare-category grouping (`__other__`) using `rare_category_min_share`; unknown categories handled at inference.
 - [ ] Engineered features from EDA findings.
-- [ ] `make preprocess` writes cleaned data to `data/interim/` / `data/processed/`.
 - [ ] Tests: pipeline fits/transforms, handles missing and unseen categories.
 - **Files:** `src/apex/data/features.py`, `tests/test_features.py`, `Makefile`
 - **Done when:** one pipeline object goes from raw rows to model-ready features, and it is fitted on training data only.
@@ -244,3 +243,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | — | Notebooks removed from the repo; `notebooks/` is now git-ignored local scratch for testing. All code lives in `src/` and `tests/`. |
 | 2026-10-05 | 1.4 | Leakage audit: 9 post-contact columns dropped (`Tags` alone adds +0.148 PR-AUC); quick-model base PR-AUC 0.804 vs. 0.385 random; `make leakage`; ADR-001; cleaned data → 9,240 × 14. |
 | 2026-10-05 | — | Full cleaning: missing values filled (`"Missing"`, fixed medians), `How did you hear…` dropped (78.5% empty), outliers capped (30 / 15), `Country` → India / Other, integer types, logic check; `docs/data_cleaning.md`, ADR-002; cleaned data → 9,240 × 13, 0 nulls. |
+| 2026-10-05 | — | Removed `data/interim/` and `data/processed/`: cleaning runs in memory with `clean(load_raw())`; `make preprocess` removed. |

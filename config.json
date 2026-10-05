@@ -5,8 +5,6 @@
   },
   "paths": {
     "raw_dir": "data/raw",
-    "interim_dir": "data/interim",
-    "processed_dir": "data/processed",
     "models_dir": "models",
     "figures_dir": "reports/figures",
     "monitoring_reports_dir": "reports/monitoring",
@@ -16,7 +14,6 @@
   "files": {
     "raw_leads": "Leads.csv",
     "raw_data_dictionary": "Leads Data Dictionary.xlsx",
-    "interim_leads": "leads_clean.parquet",
     "model": "model.pkl",
     "model_meta": "model_meta.json",
     "reference_profile": "reference_profile.json"

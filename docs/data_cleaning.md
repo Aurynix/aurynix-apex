@@ -3,8 +3,11 @@
 > What `clean()` does to the raw leads, and why. Code: [`src/apex/data/clean.py`](../src/apex/data/clean.py). Rules and values: `config.json → data`.
 > Findings behind these rules: [data_quality.md](data_quality.md) (step 1.3) and [data_dictionary.md](data_dictionary.md) (leakage audit, step 1.4).
 
-```bash
-make preprocess   # data/raw/Leads.csv → data/interim/leads_clean.parquet
+```python
+from apex.data.clean import clean
+from apex.data.load import load_raw
+
+df = clean(load_raw())   # no saved copy: cleaning runs in under a second
 ```
 
 **Before:** 9,240 rows × 37 columns, hidden nulls, text Yes/No, outliers, post-contact columns.

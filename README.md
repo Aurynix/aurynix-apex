@@ -317,9 +317,7 @@ Drift shows that the **data** changed, not that the model is **wrong**. Once con
 ```
 aurynix-apex/
 ├── data/                          # git-ignored
-│   ├── raw/                       # Leads.csv
-│   ├── interim/
-│   └── processed/
+│   └── raw/                       # Leads.csv (the only copy; cleaned in memory)
 ├── docs/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
@@ -399,7 +397,7 @@ make data-info       # print shape, SHA-256, and conversion rate
 ```
 
 ```bash
-make pipeline      # preprocess + train
+make pipeline      # clean + train
 make run           # start the API → http://localhost:8000/docs
 make demo          # start the Streamlit demo
 ```
@@ -415,11 +413,11 @@ Run `make help` for the full list.
 | Environment | `make venv` / `make install` / `make lock` | Create venv / install locked dependencies / update `uv.lock` |
 | Data | `make data-download` | Download the Kaggle dataset into `data/raw/` |
 | | `make data-info` | Print shape, hash, and target rate of the raw data |
-| | `make preprocess` | Clean data → `data/interim/` (features added in step 2.1) |
+| | `make leakage` | Compare a quick model with and without leakage suspects |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
-| | `make pipeline` | `preprocess` + `train` |
+| | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
 | | `make demo` | Start Streamlit demo |
 | Monitoring | `make monitor` | Run drift monitoring |
