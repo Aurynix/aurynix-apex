@@ -17,7 +17,9 @@
     "raw_data_dictionary": "Leads Data Dictionary.xlsx",
     "model": "model.pkl",
     "model_meta": "model_meta.json",
-    "reference_profile": "reference_profile.json"
+    "reference_profile": "reference_profile.json",
+    "model_card": "model_card.json",
+    "predictions": "predictions.csv"
   },
   "source": {
     "kaggle_dataset": "amritachatterjee09/lead-scoring-dataset",
@@ -101,6 +103,17 @@
     "random_state": 42,
     "test_size": 0.2,
     "val_size": 0.2
+  },
+  "serving": {
+    "input_fields": [
+      "Lead Origin",
+      "Lead Source",
+      "Do Not Email",
+      "TotalVisits",
+      "Total Time Spent on Website",
+      "Specialization",
+      "What is your current occupation"
+    ]
   },
   "segmentation": {
     "high_share": 0.2,

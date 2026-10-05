@@ -170,11 +170,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/explain.py`, `tests/test_explain.py`, `reports/figures/explain_importance.png`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** `explain_one(lead)` returns readable top reasons.
 
-### 3.5 Training artifacts
-- [ ] `make train` saves `models/model.pkl`, `models/model_meta.json` (version, metrics, thresholds, training date, feature list).
-- [ ] Implement `reference.py`: build `models/reference_profile.json` (bin edges, category shares, missing rates, score distribution, segment shares).
-- [ ] `predict.py` + `make predict` for offline batch scoring.
-- **Files:** `src/apex/models/train.py`, `src/apex/models/predict.py`, `src/apex/monitoring/reference.py`
+### 3.5 Training artifacts ✅
+- [x] `make train` saves `models/model.pkl`, `models/model_meta.json` (version, metrics, thresholds, training date, feature list).
+- [x] Implement `reference.py`: build `models/reference_profile.json` (bin edges, category shares, missing rates, score distribution, segment shares).
+- [x] `predict.py` + `make predict` for offline batch scoring.
+- [x] Model card `models/model_card.json` (details, intended use, data, features, algorithm, performance, risk rating, limitations, monitoring); committed to git.
+- **Files:** `src/apex/models/train.py`, `src/apex/models/predict.py`, `src/apex/models/card.py`, `src/apex/monitoring/reference.py`, `tests/test_reference.py`, `tests/test_card.py`, `tests/test_predict.py`, `config.json`, `Makefile`, `models/model_card.json`
 - **Done when:** `make pipeline` runs end to end from `Leads.csv` to all three artifacts.
 
 ---
@@ -255,3 +256,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 3.2 | Calibration (`make calibration`, out-of-fold on train + val): raw LR ECE 0.031 (target ≤ 0.05), mean prediction 0.386 vs. 0.385 actual; isotonic ECE 0.006 but 5 models and indirect explanations. Kept raw probabilities (ADR-005). |
 | 2026-10-06 | 3.3 | Segmentation (`make segments`): thresholds High ≥ 0.751, Medium ≥ 0.270 from out-of-fold scores; test: High 84.1% conversion (43% of buyers), Low 11.8% (7.1×); High + Medium hold 84.6% of buyers. |
 | 2026-10-06 | 3.4 | Explainability (`make explain`): exact linear SHAP (weight × (value − mean)), matches `shap.LinearExplainer`; one-hot and the 4 website inputs grouped into readable reasons; top drivers: website activity, occupation, lead origin, specialization; agrees with EDA; `Explainer.explain_one(lead)` returns probability + top reasons up / down. |
+| 2026-10-06 | 3.5 | `make train` fits the final model on all 9,240 leads and saves `model.pkl`, `model_meta.json`, `reference_profile.json`, `model_card.json` (risk rating Low); thresholds from out-of-fold scores on all rows (High ≥ 0.746, Medium ≥ 0.275); `make predict` → `data/predictions.csv`; `make pipeline` runs end to end. |

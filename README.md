@@ -192,6 +192,8 @@ Final model: **Logistic Regression** on 24 features built from 7 raw lead fields
 
 ![Test evaluation](reports/figures/test_evaluation.png)
 
+**Model card:** [`models/model_card.json`](models/model_card.json): data, algorithm, performance, risk rating (overall **Low**), limitations, and monitoring plan.
+
 The test score is lower than validation (0.839) and cross-validation (0.818 ± 0.011). The test leads have the same mix as the other splits, and the 95% intervals of validation and test meet near the CV average, so this is sampling variation; the expected PR-AUC on new leads is about **0.80 ± 0.03**. Details: [docs/models.md](docs/models.md).
 
 ---
@@ -402,7 +404,7 @@ aurynix-apex/
 │               └── monitoring.py
 ├── app/
 │   └── demo.py                    # Streamlit demo
-├── models/                        # git-ignored artifacts
+├── models/                        # artifacts (git-ignored), except model_card.json
 ├── reports/
 │   ├── figures/
 │   └── monitoring/
@@ -441,7 +443,7 @@ make data-info       # print shape, SHA-256, and conversion rate
 ```
 
 ```bash
-make pipeline      # clean + train
+make pipeline      # split → train final model → batch predictions
 make run           # start the API → http://localhost:8000/docs
 make demo          # start the Streamlit demo
 ```
@@ -462,15 +464,15 @@ Run `make help` for the full list.
 | | `make features` | Fit the feature pipeline and list the features |
 | | `make split` | Create the fixed train / validation / test split |
 | | `make baselines` | Fit no-skill + Logistic Regression, log to MLflow |
-| | `make train` | Train model, save artifacts and reference profile |
+| | `make train` | Fit the final model on all leads; save model, meta, reference profile, model card |
 | | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
 | | `make tune` | Grid search over `C` and class weights, logged to MLflow |
 | | `make evaluate` | Retrain on train + val, score the test set once, save figure |
 | | `make calibration` | Check probability calibration (raw / Platt / isotonic), save figure |
 | | `make segments` | Derive High / Medium / Low thresholds and print segment tables |
 | | `make explain` | Global feature importance and example per-lead reasons |
-| | `make predict` | Offline batch scoring |
-| | `make pipeline` | Clean + train |
+| | `make predict` | Score `Leads.csv` with the saved model → `data/predictions.csv` |
+| | `make pipeline` | `split` + `train` + `predict`, end to end |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
 | | `make demo` | Start Streamlit demo |
 | Monitoring | `make monitor` | Run drift monitoring |
@@ -509,7 +511,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 
 ### Week 4: Ship & Monitor
 - [ ] FastAPI service with prediction logging
-- [ ] Reference profile at training time
+- [x] Reference profile at training time
 - [ ] Data drift and score drift monitoring
 - [ ] Docker and Streamlit demo
 - [ ] Final documentation

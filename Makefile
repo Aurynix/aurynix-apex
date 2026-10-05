@@ -57,8 +57,8 @@ segments: ## Step 3.3: derive High / Medium / Low thresholds and print segment t
 explain: ## Step 3.4: global feature importance, figure, and example per-lead reasons
 	$(RUN) python -m apex.models.explain
 
-train: ## Train model, save artifacts and reference profile
-	$(todo)
+train: ## Fit the final model on all leads; save model, meta, reference profile, model card
+	$(RUN) python -m apex.models.train final
 
 cv: ## 5-fold CV on the train split: all vs. selected features, log to MLflow
 	$(RUN) python -m apex.models.cv features
@@ -66,10 +66,10 @@ cv: ## 5-fold CV on the train split: all vs. selected features, log to MLflow
 tune: ## Grid search over Logistic Regression C and class_weight (5-fold CV), log to MLflow
 	$(RUN) python -m apex.models.cv tune
 
-predict: ## Offline batch scoring
-	$(todo)
+predict: ## Score data/raw/Leads.csv with the saved model → data/predictions.csv
+	$(RUN) python -m apex.models.predict
 
-pipeline: train ## Full pipeline (cleaning runs inside train)
+pipeline: split train predict ## Leads.csv → split → final model + artifacts → predictions
 
 # ---------- Serving ----------
 run: ## Start the API (dev, auto-reload)
