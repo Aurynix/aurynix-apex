@@ -109,11 +109,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/data/features.py`, `tests/test_features.py`, `docs/features.md`, `config.json`, `Makefile`
 - **Done when:** one pipeline object goes from raw rows to model-ready features, and it is fitted on training data only.
 
-### 2.2 Stratified splits — *Stage 6*
-- [ ] Train / validation / test split, stratified on target, seeded by `random_state`.
-- [ ] Save split indices so they are reproducible.
-- [ ] Rule: the test set is not touched until step 3.1.
-- **Files:** `src/apex/models/train.py` (or a `split` helper)
+### 2.2 Stratified splits — *Stage 6* ✅
+- [x] Train / validation / test split, stratified on target, seeded by `random_state`.
+- [x] Save split indices so they are reproducible.
+- [x] Rule: the test set is not touched until step 3.1.
+- **Files:** `src/apex/data/split.py`, `tests/test_split.py`, `docs/splits.md`, `config.json`, `Makefile`
 - **Done when:** splits are fixed, reproducible, and class ratios match across splits.
 
 ### 2.3 Baselines — *Stage 7*
@@ -246,3 +246,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | — | Removed `data/interim/` and `data/processed/`: cleaning runs in memory with `clean(load_raw())`; `make preprocess` removed. |
 | 2026-10-05 | 1.5 | EDA (`make eda`): time on site is the strongest numeric (14% → 69%), visits/page views flat; Lead Add Form 92.5%, Working Professional 92%, occupation missing 14%; "what matters most" duplicates occupation missingness; 7 feature ideas for 2.1 in `docs/eda.md`. |
 | 2026-10-05 | 2.1 | Feature pipeline (`make features`): clean → `time_per_visit`, `has_web_activity`, drop "what matters most" → scale + one-hot (rare/unseen → infrequent); 36 raw columns → 51 features; quick CV PR-AUC 0.810 → 0.816. |
+| 2026-10-05 | 2.2 | Stratified 60/20/20 split (`make split`) saved as `data/splits.csv`; conversion 38.5% in every split; `load_splits()` hides test unless `include_test=True`; 22% of val/test leads have a look-alike in train (kept, documented). |

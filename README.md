@@ -325,6 +325,7 @@ aurynix-apex/
 │   ├── data_cleaning.md           # cleaning steps & why
 │   ├── eda.md                     # EDA findings & feature ideas
 │   ├── features.md                # feature pipeline & decisions
+│   ├── splits.md                  # train / val / test split
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md
@@ -418,6 +419,7 @@ Run `make help` for the full list.
 | | `make leakage` | Compare a quick model with and without leakage suspects |
 | | `make eda` | Print EDA tables and save figures to `reports/figures/` |
 | | `make features` | Fit the feature pipeline and list the features |
+| | `make split` | Create the fixed train / validation / test split |
 | | `make train` | Train model, save artifacts and reference profile |
 | | `make cv` | Cross-validation |
 | | `make predict` | Offline batch scoring |
@@ -447,7 +449,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 
 ### Week 2: Build Models
 - [x] Preprocessing and feature pipeline
-- [ ] Stratified splits
+- [x] Stratified splits
 - [ ] Baselines (majority class, Logistic Regression)
 - [ ] Model comparison in MLflow
 - [ ] Imbalance handling and Optuna tuning
