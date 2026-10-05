@@ -72,11 +72,11 @@ predict: ## Score data/raw/Leads.csv with the saved model → data/predictions.c
 pipeline: split train predict ## Leads.csv → split → final model + artifacts → predictions
 
 # ---------- Serving ----------
-run: ## Start the API (dev, auto-reload)
-	$(todo)
+run: ## Start the API (dev, auto-reload) → http://localhost:8000/docs (needs `make train`)
+	$(RUN) uvicorn apex.api.app:app --reload --port 8000
 
-run-prod: ## Start the API (prod)
-	$(todo)
+run-prod: ## Start the API (prod, 2 workers)
+	$(RUN) uvicorn apex.api.app:app --host 0.0.0.0 --port 8000 --workers 2
 
 demo: ## Start the Streamlit demo
 	$(todo)

@@ -50,24 +50,35 @@ class Explainer:
         columns = pd.DataFrame(per_column, columns=self._input_names(), index=leads.index)
         return columns.T.groupby(self._source_fields()).sum().T
 
+    def explain(self, leads: pd.DataFrame, top: int = 3) -> list[dict]:
+        """Top reasons up and down for each lead (one dict per row)."""
+        contributions = self.contributions(leads)
+        values = self.model[0][:-1].transform(leads)  # as the model sees them
+        results = []
+        for (_, row), (_, lead_values) in zip(
+            contributions.iterrows(), values.iterrows(), strict=True
+        ):
+            reasons = [
+                {
+                    "feature": LABELS.get(f, f),
+                    "value": _readable(lead_values, f),
+                    "impact": round(float(v), 3),
+                }
+                for f, v in row.sort_values(key=abs, ascending=False).items()
+                if v != 0
+            ]
+            results.append(
+                {
+                    "reasons_up": [r for r in reasons if r["impact"] > 0][:top],
+                    "reasons_down": [r for r in reasons if r["impact"] < 0][:top],
+                }
+            )
+        return results
+
     def explain_one(self, lead: pd.DataFrame, top: int = 3) -> dict:
         """Score plus the top reasons up and down for one lead (a one-row DataFrame)."""
-        row = self.contributions(lead).iloc[0]
-        values = self.model[0][:-1].transform(lead).iloc[0]  # as the model sees them
-        reasons = [
-            {
-                "feature": LABELS.get(f, f),
-                "value": _readable(values, f),
-                "impact": round(float(v), 3),
-            }
-            for f, v in row.sort_values(key=abs, ascending=False).items()
-            if v != 0
-        ]
-        return {
-            "probability": round(float(self.model.predict_proba(lead)[0, 1]), 3),
-            "reasons_up": [r for r in reasons if r["impact"] > 0][:top],
-            "reasons_down": [r for r in reasons if r["impact"] < 0][:top],
-        }
+        probability = round(float(self.model.predict_proba(lead)[0, 1]), 3)
+        return {"probability": probability, **self.explain(lead, top)[0]}
 
     def importance(self, leads: pd.DataFrame) -> pd.Series:
         """Global importance: mean absolute contribution per raw field, largest first."""

@@ -253,38 +253,45 @@ Every score comes with its reasons. For Logistic Regression, SHAP values are exa
 
 ## API
 
-Built with FastAPI and split into routers.
+Built with FastAPI. Routers only validate requests; a single `ScoringService` does the work (score → segment → explain → log). At startup the API loads the saved model once; it never trains. Full reference: [docs/api.md](docs/api.md).
+
+```bash
+make train   # once: save the model
+make run     # → http://localhost:8000/docs
+```
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness check |
-| `GET` | `/model/info` | Model version, metrics, training date |
-| `POST` | `/predict/single` | Score one lead |
-| `POST` | `/predict/batch` | Score a CSV or a list of leads |
-| `POST` | `/predict/explain` | SHAP explanation for one lead |
-| `POST` | `/pipeline/train` | Start a training job |
-| `GET` | `/pipeline/jobs/{id}` | Check job status |
-| `POST` | `/monitoring/run` | Run drift monitoring now |
-| `GET` | `/monitoring/latest` | Latest drift result |
-| `GET` | `/monitoring/history` | Score drift over time |
-| `GET` | `/monitoring/features/{name}` | Drift history for one feature |
+| `GET` | `/health` | Liveness check and loaded model version |
+| `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
+| `POST` | `/predict/single` | Score one lead: score, segment, reasons |
+| `POST` | `/predict/batch` | Score a list of leads (up to 10,000) |
+| `POST` | `/pipeline/train` | Start a training job *(planned, step 4.3)* |
+| `GET` | `/pipeline/jobs/{id}` | Check job status *(planned, step 4.3)* |
+| `POST` | `/monitoring/run` | Run drift monitoring now *(planned, step 4.4)* |
+| `GET` | `/monitoring/latest` | Latest drift result *(planned, step 4.4)* |
+| `GET` | `/monitoring/history` | Score drift over time *(planned, step 4.4)* |
+| `GET` | `/monitoring/features/{name}` | Drift history for one feature *(planned, step 4.4)* |
 
-Interactive docs at `http://localhost:8000/docs` once the API is running.
-
-**Planned response for `/predict/single`:**
+**Response of `/predict/single`** (reasons are always included, so there is no separate explain call):
 
 ```json
 {
-  "probability": 0.82,
-  "segment": "High",
-  "model_version": "apex-v1.0.0",
-  "top_reasons": [
-    { "feature": "TotalVisits", "impact": 0.21 },
-    { "feature": "Lead Source=Google", "impact": 0.14 },
-    { "feature": "Total Time Spent on Website", "impact": 0.11 }
-  ]
+  "score": 0.9568,
+  "segment": "high",
+  "reasons": {
+    "up": [
+      "Occupation = Working Professional",
+      "Website activity = 3 visits, 20 min on site",
+      "Specialization = Given"
+    ],
+    "down": ["Lead origin = Landing Page Submission"]
+  },
+  "model_version": "apex-v0.1.0"
 }
 ```
+
+Every scored lead is logged to SQLite (`data/apex.db`, table `predictions`) for monitoring.
 
 ## Monitoring: Data Drift & Score Drift
 
@@ -473,7 +480,7 @@ Run `make help` for the full list.
 | | `make explain` | Global feature importance and example per-lead reasons |
 | | `make predict` | Score `Leads.csv` with the saved model → `data/predictions.csv` |
 | | `make pipeline` | `split` + `train` + `predict`, end to end |
-| Serving | `make run` / `make run-prod` | Start API (dev / prod) |
+| Serving | `make run` / `make run-prod` | Start the API with the saved model (dev with reload / prod with 2 workers) |
 | | `make demo` | Start Streamlit demo |
 | Monitoring | `make monitor` | Run drift monitoring |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
@@ -510,7 +517,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] SHAP explainability
 
 ### Week 4: Ship & Monitor
-- [ ] FastAPI service with prediction logging
+- [x] FastAPI service with prediction logging
 - [x] Reference profile at training time
 - [ ] Data drift and score drift monitoring
 - [ ] Docker and Streamlit demo
