@@ -219,3 +219,44 @@ Raw model, per group:
 - Platt scaling changes nothing (Logistic Regression is already a sigmoid model).
 
 Revisit if the product shows exact percentages to reps and the 0.5–0.9 range matters; switching is one line (`CalibratedClassifierCV(make_model(), method="isotonic")`).
+
+## Step 3.3: Segmentation
+
+```bash
+make segments   # derive the thresholds and print the segment tables
+```
+
+Segments follow **sales capacity** (`config.json → segmentation`): the team calls the top 20% of leads the same day (**High**), follows up the next 30% within the week (**Medium**), and leaves the bottom 50% to automated email (**Low**). Code: [`segment.py`](../src/apex/models/segment.py).
+
+**Thresholds.** Shares are turned into fixed score cut-offs once, from out-of-fold scores on train + validation (each lead scored by a model that did not see it):
+
+| Segment | Score | Action |
+|---|---|---|
+| 🟢 High | ≥ **0.751** | Call the same day |
+| 🟡 Medium | 0.270 – 0.751 | Follow up within the week |
+| 🔴 Low | < **0.270** | Automated email nurturing |
+
+A new lead is segmented by comparing its score with these numbers. If the team's capacity changes, only the shares in config change. The final thresholds are stored in `model_meta.json` with the saved model (step 3.5).
+
+**Out-of-fold, train + validation (7,392 leads)** (used to set the thresholds):
+
+| Segment | Leads | Share of leads | Converted | Conversion rate | Share of all conversions |
+|---|---|---|---|---|---|
+| 🟢 High | 1,479 | 20% | 1,282 | **86.7%** | **45.0%** |
+| 🟡 Medium | 2,217 | 30% | 1,147 | 51.7% | 40.3% |
+| 🔴 Low | 3,696 | 50% | 420 | **11.4%** | 14.7% |
+
+**Test, step 3.1 model (1,848 leads)** (thresholds fixed first; the test predictions are only reported, nothing is tuned on them):
+
+| Segment | Leads | Share of leads | Converted | Conversion rate | Share of all conversions |
+|---|---|---|---|---|---|
+| 🟢 High | 364 | 19.7% | 306 | **84.1%** | **43.0%** |
+| 🟡 Medium | 549 | 29.7% | 296 | 53.9% | 41.6% |
+| 🔴 Low | 935 | 50.6% | 110 | **11.8%** | 15.4% |
+
+Against the targets ([problem_framing.md](problem_framing.md) 5.1):
+- High converts at **7.1×** the rate of Low on test (84.1% vs. 11.8%); target ≥ 3× ✅.
+- High + Medium (half the leads) hold **84.6%** of conversions on test; target ≥ 80% ✅.
+- High holds 43% of conversions with 20% of leads (lift 2.2) ✅.
+
+**Trade-off of the Low segment:** it still contains about 15% of all buyers (110 on test). They are not lost: they get automated emails, and a reply moves them up.

@@ -219,13 +219,21 @@ Segments are based on **sales-team capacity**, not arbitrary probability cut-off
 
 Example: if the team can contact 20% of leads, the top 20% of scores are **High**.
 
-| Segment | Action |
-|---|---|
-| 🟢 High | Contact first, same day |
-| 🟡 Medium | Follow up within the week |
-| 🔴 Low | Automated nurturing (email sequences) |
+| Segment | Share of leads | Score | Action |
+|---|---|---|---|
+| 🟢 High | Top 20% | ≥ 0.751 | Contact first, same day |
+| 🟡 Medium | Next 30% | 0.270 – 0.751 | Follow up within the week |
+| 🔴 Low | Bottom 50% | < 0.270 | Automated nurturing (email sequences) |
 
-The final report will include a table showing, for each segment: number of leads, share of all conversions captured, and actual conversion rate.
+Results on the held-out test set (1,848 leads, `make segments`):
+
+| Segment | Leads | Conversion rate | Share of all conversions |
+|---|---|---|---|
+| 🟢 High | 364 (19.7%) | **84.1%** | **43.0%** |
+| 🟡 Medium | 549 (29.7%) | 53.9% | 41.6% |
+| 🔴 Low | 935 (50.6%) | 11.8% | 15.4% |
+
+High leads convert **7× more often** than Low leads, and half of the leads (High + Medium) hold 85% of all conversions. Thresholds come from out-of-fold scores, not from the test set; details in [docs/models.md](docs/models.md).
 
 ## Explainability
 
@@ -450,6 +458,7 @@ Run `make help` for the full list.
 | | `make tune` | Grid search over `C` and class weights, logged to MLflow |
 | | `make evaluate` | Retrain on train + val, score the test set once, save figure |
 | | `make calibration` | Check probability calibration (raw / Platt / isotonic), save figure |
+| | `make segments` | Derive High / Medium / Low thresholds and print segment tables |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -485,7 +494,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 ### Week 3: Evaluate & Explain
 - [x] Final test-set evaluation
 - [x] Probability calibration
-- [ ] High / Medium / Low segmentation
+- [x] High / Medium / Low segmentation
 - [ ] SHAP explainability
 
 ### Week 4: Ship & Monitor

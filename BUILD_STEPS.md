@@ -156,11 +156,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/train.py`, `src/apex/models/evaluate.py`, `tests/test_evaluate.py`, `reports/figures/calibration.png`, `docs/models.md`, `docs/decisions.md` (ADR-005), `Makefile`
 - **Done when:** a predicted 0.70 means roughly 70% actually convert (within reason).
 
-### 3.3 Segmentation — *Stage 11*
-- [ ] Implement `segment.py`: capacity-based cut-offs from `config.json → segmentation`.
-- [ ] Derive score thresholds on validation scores; store them in `model_meta.json`.
-- [ ] Segment table: number of leads, share of conversions captured, actual conversion rate.
-- **Files:** `src/apex/models/segment.py`, `tests/test_segment.py`
+### 3.3 Segmentation — *Stage 11* ✅
+- [x] Implement `segment.py`: capacity-based cut-offs from `config.json → segmentation`.
+- [x] Derive score thresholds from out-of-fold scores on train + validation (stored in `model_meta.json` in step 3.5).
+- [x] Segment table: number of leads, share of conversions captured, actual conversion rate.
+- **Files:** `src/apex/models/segment.py`, `tests/test_segment.py`, `src/apex/models/train.py`, `docs/models.md`, `README.md`, `Makefile`
 - **Done when:** segments come out of config and the segment table shows that High captures far more conversions than its share of leads.
 
 ### 3.4 Explainability — *Stage 12*
@@ -253,3 +253,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 2.5 | Tuning (`make tune`, 14 setups): `C` 0.3–10 is a plateau (CV PR-AUC ≈ 0.817); `balanced` class weights do not improve ranking and inflate probabilities (val mean 0.461 vs. 0.385). Kept `C = 1`, no class weights (ADR-004, `config.json → model`); validation PR-AUC 0.839. |
 | 2026-10-06 | 3.1 | Test set used once (`make evaluate`, fitted on train + val): PR-AUC 0.787 (95% CI 0.756–0.816), ROC-AUC 0.855, Brier 0.149; top 20% precision 83.2% / recall 43.3%, top 50% recall 85.4%; all business targets met. Lower than validation (0.839): sampling variation, same lead mix. README results filled in. |
 | 2026-10-06 | 3.2 | Calibration (`make calibration`, out-of-fold on train + val): raw LR ECE 0.031 (target ≤ 0.05), mean prediction 0.386 vs. 0.385 actual; isotonic ECE 0.006 but 5 models and indirect explanations. Kept raw probabilities (ADR-005). |
+| 2026-10-06 | 3.3 | Segmentation (`make segments`): thresholds High ≥ 0.751, Medium ≥ 0.270 from out-of-fold scores; test: High 84.1% conversion (43% of buyers), Low 11.8% (7.1×); High + Medium hold 84.6% of buyers. |

@@ -50,6 +50,13 @@ def make_baselines(config: dict[str, Any] | None = None) -> dict[str, Pipeline]:
     }
 
 
+def out_of_fold_scores(model: Pipeline, X: pd.DataFrame, y: pd.Series, config=None):
+    """Score every lead with a model trained on the other folds (5-fold, stratified)."""
+    cfg = config or load_config()
+    folds = StratifiedKFold(5, shuffle=True, random_state=cfg["split"]["random_state"])
+    return cross_val_predict(model, X, y, cv=folds, method="predict_proba")[:, 1]
+
+
 def fit_and_log(name: str, model: Pipeline, parts: dict[str, pd.DataFrame], target: str) -> dict:
     """Fit on train, score on val, and log params + metrics as one MLflow run."""
     X_train, y_train = parts["train"].drop(columns=[target]), parts["train"][target]
@@ -135,7 +142,6 @@ def run_calibration() -> pd.DataFrame:
     target = cfg["data"]["target"]
     data = pd.concat([parts["train"], parts["val"]])
     X, y = data.drop(columns=[target]), data[target]
-    folds = StratifiedKFold(5, shuffle=True, random_state=cfg["split"]["random_state"])
 
     candidates = {
         "raw": make_model(cfg),
@@ -144,7 +150,7 @@ def run_calibration() -> pd.DataFrame:
     }
     rows, curves = {}, {}
     for name, model in candidates.items():
-        scores = cross_val_predict(model, X, y, cv=folds, method="predict_proba")[:, 1]
+        scores = out_of_fold_scores(model, X, y, cfg)
         metrics = evaluate(y, scores)
         rows[name] = {k: metrics[k] for k in ("ece", "brier", "pr_auc", "roc_auc")}
         rows[name]["mean_predicted"] = round(float(scores.mean()), 4)
