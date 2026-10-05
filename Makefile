@@ -4,6 +4,8 @@
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
 RUN := uv run
+API_PORT ?= 8000
+DEMO_PORT ?= 8501
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
 # Placeholder for targets whose stage is not implemented yet.
@@ -72,14 +74,15 @@ predict: ## Score data/raw/Leads.csv with the saved model → data/predictions.c
 pipeline: split train predict ## Leads.csv → split → final model + artifacts → predictions
 
 # ---------- Serving ----------
-run: ## Start the API (dev, auto-reload) → http://localhost:8000/docs (needs `make train`)
-	$(RUN) uvicorn apex.api.app:app --reload --port 8000
+run: ## Start the API (dev, auto-reload) → http://localhost:8000/docs (needs `make train`; API_PORT=… to change)
+	$(RUN) uvicorn apex.api.app:app --reload --port $(API_PORT)
 
 run-prod: ## Start the API (prod, 2 workers)
-	$(RUN) uvicorn apex.api.app:app --host 0.0.0.0 --port 8000 --workers 2
+	$(RUN) uvicorn apex.api.app:app --host 0.0.0.0 --port $(API_PORT) --workers 2
 
-demo: ## Start the Streamlit demo
-	$(todo)
+demo: ## Start the Streamlit demo → http://localhost:8501 (needs the API: `make run`)
+	API_URL=http://localhost:$(API_PORT) $(RUN) streamlit run app/demo.py --server.port $(DEMO_PORT) \
+		--server.headless true --browser.gatherUsageStats false
 
 # ---------- Monitoring ----------
 monitor: ## Drift monitoring on the last 7 days of API predictions (data/apex.db)
@@ -92,10 +95,11 @@ mlflow-ui: ## Open MLflow at http://localhost:5000
 	$(RUN) mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 
 # ---------- Docker ----------
-docker-build: ## Build the Docker image
+docker-build: ## Build the Docker image (API + demo)
 	docker compose build
 
-docker-up: ## Start containers
+docker-up: ## Start API + demo in Docker (needs `make train` first; uses models/)
+	@test -f models/model.pkl || (echo "models/model.pkl not found: run \`make train\` first." && exit 1)
 	docker compose up -d
 
 docker-down: ## Stop containers
