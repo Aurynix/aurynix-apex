@@ -9,6 +9,7 @@
     "figures_dir": "reports/figures",
     "monitoring_reports_dir": "reports/monitoring",
     "database": "data/apex.db",
+    "splits": "data/splits.csv",
     "mlflow_tracking_uri": "mlruns"
   },
   "files": {
