@@ -1,12 +1,12 @@
 """Clean raw leads.
 
-Cleaning is **stateless**: every rule comes from config.json, nothing is learned
-from the data. The same function can therefore run on the full training file
-and on a single lead at prediction time without leaking information.
-Anything that must be learned from data (outlier caps, rare-category grouping,
-imputation) belongs in features.py and is fitted on the training split only.
+Cleaning is **stateless**: every rule and every value (fill values, caps) is
+fixed in config.json, nothing is learned at run time. The same function can
+therefore run on the full training file and on a single lead at prediction time.
 
-Decisions behind each rule are documented in docs/data_quality.md.
+Steps, in order: normalize text → placeholders to missing → merge spellings →
+Yes/No to 1/0 → drop columns → group rare values → validate → fill missing →
+fix types → cap outliers. Each step is explained in docs/data_cleaning.md.
 
 Run `python -m apex.data.clean` (or `make preprocess`) to write
 data/interim/leads_clean.parquet (name set in config.json → files).
@@ -60,6 +60,15 @@ def encode_binary(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     return df
 
 
+def group_other(df: pd.DataFrame, keep: dict[str, list[str]]) -> pd.DataFrame:
+    """Keep the listed values of a column and turn every other value into "Other"."""
+    df = df.copy()
+    for col, values in keep.items():
+        if col in df.columns:
+            df[col] = df[col].where(df[col].isna() | df[col].isin(values), "Other")
+    return df
+
+
 def validate(df: pd.DataFrame, target: str | None, numeric_columns: list[str]) -> None:
     """Fail loudly on values that should be impossible."""
     if target is not None and target in df.columns:
@@ -69,6 +78,27 @@ def validate(df: pd.DataFrame, target: str | None, numeric_columns: list[str]) -
     for col in numeric_columns:
         if col in df.columns and (df[col] < 0).any():
             raise ValueError(f"{col!r} has negative values.")
+    visits, views = "TotalVisits", "Page Views Per Visit"
+    if {visits, views} <= set(df.columns) and ((df[visits] == 0) & (df[views] > 0)).any():
+        raise ValueError("Page views recorded for a lead with 0 visits.")
+
+
+def fill_missing(df: pd.DataFrame, numeric_fill: dict[str, float], label: str) -> pd.DataFrame:
+    """Fill numbers with fixed values and text with a "Missing" category."""
+    df = df.copy()
+    df = df.fillna({col: v for col, v in numeric_fill.items() if col in df.columns})
+    text_cols = df.select_dtypes(exclude="number").columns
+    df[text_cols] = df[text_cols].fillna(label)
+    return df
+
+
+def cap_outliers(df: pd.DataFrame, caps: dict[str, float]) -> pd.DataFrame:
+    """Clip extreme values to a fixed upper limit; rows are kept."""
+    df = df.copy()
+    for col, cap in caps.items():
+        if col in df.columns:
+            df[col] = df[col].clip(upper=cap)
+    return df
 
 
 def clean(df: pd.DataFrame, config: dict[str, Any] | None = None) -> pd.DataFrame:
@@ -85,8 +115,15 @@ def clean(df: pd.DataFrame, config: dict[str, Any] | None = None) -> pd.DataFram
 
     to_drop = cfg["id_columns"] + cfg["drop_columns"] + cfg["leakage_columns"]
     df = df.drop(columns=[c for c in to_drop if c in df.columns])
+    df = group_other(df, cfg["group_other"])
 
     validate(df, cfg["target"], cfg["numeric_columns"])
+
+    df = fill_missing(df, cfg["numeric_fill"], cfg["missing_label"])
+    for col in cfg["integer_columns"]:
+        if col in df.columns:
+            df[col] = df[col].astype(int)
+    df = cap_outliers(df, cfg["caps"])
     return df
 
 
