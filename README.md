@@ -327,10 +327,7 @@ aurynix-apex/
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md
 │   └── deployment.md
-├── notebooks/
-│   ├── 01_eda.ipynb
-│   ├── 02_modeling.ipynb
-│   └── 03_explainability.ipynb
+├── notebooks/                     # local scratch for testing (git-ignored)
 ├── src/
 │   └── apex/
 │       ├── config.py              # loads config.json

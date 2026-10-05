@@ -1,7 +1,7 @@
 # Data Quality Report
 
 > Stage 3, part 1 (step 1.3). Data: `data/raw/Leads.csv`, 9,240 rows × 37 columns, SHA-256 `1426dffd…3762802` (see [data_dictionary.md](data_dictionary.md)).
-> Reproduce with [`notebooks/01_eda.ipynb`](../notebooks/01_eda.ipynb). Cleaning code: [`src/apex/data/clean.py`](../src/apex/data/clean.py).
+> Cleaning code: [`src/apex/data/clean.py`](../src/apex/data/clean.py).
 
 Every issue found below has a **decision** with a reason. The cleaning rules live in `config.json → data` and are **stateless**: nothing is learned from the data, so the same rules apply to one new lead at prediction time. Anything that must be learned from data (outlier caps, rare-category grouping, imputation) is deferred to the feature pipeline (step 2.1), where it is fitted on the training split only.
 
