@@ -430,7 +430,7 @@ aurynix-apex/
 │               ├── predict.py
 │               └── monitoring.py
 ├── app/
-│   └── demo.py                    # Streamlit demo
+│   └── demo.py                    # Streamlit demo (API client)
 ├── models/                        # artifacts (git-ignored), except model_card.json
 ├── reports/
 │   ├── figures/
@@ -469,13 +469,22 @@ make data-download   # → data/raw/Leads.csv + data/raw/Leads Data Dictionary.x
 make data-info       # print shape, SHA-256, and conversion rate
 ```
 
+Train the model once, then run the API and the demo, locally or in Docker:
+
 ```bash
-make pipeline      # split → train final model → batch predictions
-make run           # start the API → http://localhost:8000/docs
-make demo          # start the Streamlit demo
+make pipeline      # split → train final model (models/) → batch predictions
+
+make run           # API  → http://localhost:8000/docs
+make demo          # demo → http://localhost:8501   (second terminal)
+
+# or, in Docker (API + demo, models/ mounted read-only)
+make docker-build
+make docker-up     # same URLs; `make docker-down` to stop
 ```
 
-> Commands become functional as each stage is implemented.
+Port 8000 or 8501 already taken? `make run API_PORT=8020`, `make demo API_PORT=8020 DEMO_PORT=8521`, or set `API_PORT` / `DEMO_PORT` in `.env` for Docker. Details: [docs/deployment.md](docs/deployment.md).
+
+The demo has three tabs: **score a lead** (form → score, segment, reasons), **score a CSV** (e.g. `Leads.csv` → ranked list), and **monitoring** (drift status).
 
 ## Make Targets
 
@@ -501,11 +510,11 @@ Run `make help` for the full list.
 | | `make predict` | Score `Leads.csv` with the saved model → `data/predictions.csv` |
 | | `make pipeline` | `split` + `train` + `predict`, end to end |
 | Serving | `make run` / `make run-prod` | Start the API with the saved model (dev with reload / prod with 2 workers) |
-| | `make demo` | Start Streamlit demo |
+| | `make demo` | Start the Streamlit demo (API client) → http://localhost:8501 |
 | Monitoring | `make monitor` | Drift monitoring on the last 7 days of API predictions |
 | | `make drift-demo` | Simulate stable vs. drifted traffic; only the drift is flagged |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
-| Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build / start / stop |
+| Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build the image / start API + demo / stop |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
 
 ## Configuration
@@ -541,7 +550,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] FastAPI service with prediction logging
 - [x] Reference profile at training time
 - [x] Data drift and score drift monitoring
-- [ ] Docker and Streamlit demo
+- [x] Docker and Streamlit demo
 - [ ] Final documentation
 
 ### Later

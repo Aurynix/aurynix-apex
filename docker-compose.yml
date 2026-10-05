@@ -1,14 +1,38 @@
+# make train      # once, on the host: creates models/ (mounted below)
+# make docker-up  # API → http://localhost:${API_PORT:-8000}/docs, demo → http://localhost:${DEMO_PORT:-8501}
 services:
   api:
     build: .
+    image: aurynix-apex
     container_name: apex-api
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     volumes:
-      - ./models:/app/models
-      - ./data:/app/data
-      - ./reports:/app/reports
+      - ./models:/app/models:ro       # model.pkl, model_meta.json, reference_profile.json
+      - ./data:/app/data              # apex.db (prediction log)
+      - ./reports:/app/reports        # monitoring reports
     env_file:
       - path: .env
         required: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  demo:
+    image: aurynix-apex
+    container_name: apex-demo
+    command: >
+      streamlit run app/demo.py --server.port 8501 --server.address 0.0.0.0
+      --server.headless true --browser.gatherUsageStats false
+    ports:
+      - "${DEMO_PORT:-8501}:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped

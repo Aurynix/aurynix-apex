@@ -208,10 +208,11 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/monitoring/`, `src/apex/api/` (database, app, dependencies, routers/monitoring.py), `tests/test_drift.py`, `tests/test_monitor.py`, `tests/test_api.py`, `tests/conftest.py`, `docs/monitoring.md`, `config.json`, `Makefile`
 - **Done when:** a simulated shift is flagged, and stable data is not.
 
-### 4.5 Docker & Streamlit demo
-- [ ] `make docker-build && make docker-up` serves the API with mounted models.
-- [ ] `app/demo.py`: score a lead from a form, upload a CSV, view ranked leads, reasons, and drift status.
-- **Files:** `Dockerfile`, `docker-compose.yml`, `app/demo.py`
+### 4.5 Docker & Streamlit demo ✅
+- [x] `make docker-build && make docker-up` serves the API (health check, `models/` mounted read-only) and the demo (starts when the API is healthy); ports from `API_PORT` / `DEMO_PORT`.
+- [x] `app/demo.py`: an API client with three tabs: score a lead from a form, upload a CSV (API fields or raw Kaggle columns) → ranked leads with reasons, drift status.
+- [x] Docker image size: uv cache kept out of the image with a build cache mount.
+- **Files:** `Dockerfile`, `docker-compose.yml`, `.env.example`, `app/demo.py`, `tests/test_demo.py`, `docs/deployment.md`, `Makefile`, `README.md`
 - **Done when:** a fresh machine can run the API and demo from the README instructions.
 
 ### 4.6 Final documentation
@@ -258,3 +259,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 4.1 (+4.2) | API serving (`make run`): `/health`, `/model/info`, `/predict/single`, `/predict/batch`; thin routers + `ScoringService` (score → segment → explain → log to SQLite); model loaded once at startup, never trained in the API; fixed: missing visits with 0 time on site → 0 visits (as in training). 80 tests. |
 | 2026-10-06 | 4.3 | Skipped: training stays `make train`; the API never trains. |
 | 2026-10-06 | 4.4 | Drift monitoring (`make monitor`, `/monitoring/*`): feature drift (PSI), prediction drift (score PSI + segment shares), data quality (missing, unseen, defaults, rejected requests). Simulation (`make drift-demo`): stable → ok (all PSI ≤ 0.02); new-campaign shift → drift (Lead Source 2.54, time on site 1.31, High 20% → 7%). Tests no longer need saved artifacts (shared synthetic fixtures). 92 tests. |
+| 2026-10-06 | 4.5 | Docker (API + Streamlit demo, one image, `models/` mounted read-only, API health check, configurable ports) and `app/demo.py` (API client: score a lead, score a CSV, monitoring). Image 6.27 GB → 3.51 GB by keeping the uv cache out of it. Checked with the real stack in Docker. |
