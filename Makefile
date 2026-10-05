@@ -48,8 +48,8 @@ baselines: ## Fit no-skill + Logistic Regression baselines, log to MLflow
 train: ## Train model, save artifacts and reference profile
 	$(todo)
 
-cv: ## Cross-validation
-	$(todo)
+cv: ## 5-fold CV on the train split: all vs. selected features, log to MLflow
+	$(RUN) python -m apex.models.cv
 
 predict: ## Offline batch scoring
 	$(todo)

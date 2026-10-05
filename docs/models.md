@@ -67,3 +67,38 @@ The top 20% can hold at most 20 / 38.5 ≈ 52% of buyers, so 46.2% is about 89% 
 The no-skill scores are all equal, so its ranking is arbitrary; its precision and recall values are what random calling gives, up to noise.
 
 **These numbers are the bar to beat.** The test set is untouched; its single use is step 3.1.
+
+## Step 2.4: Cross-validation and feature selection
+
+One validation score moves by about ±0.01 PR-AUC depending on which leads land in it, so choices are made on **5-fold stratified CV of the train split** (mean ± std), and the validation split confirms them.
+
+```bash
+make cv   # all features vs. selected features, logged to MLflow
+```
+
+Each feature idea from [eda.md](eda.md), tested alone (CV PR-AUC; all features = 0.8176 ± 0.011):
+
+| Change | CV PR-AUC | Effect |
+|---|---|---|
+| Drop `Page Views Per Visit` | 0.8171 | −0.0005 (noise) |
+| Drop `City` | 0.8173 | −0.0003 (noise) |
+| Drop `Country` | 0.8172 | −0.0004 (noise) |
+| Drop free-book flag | 0.8177 | +0.0001 (noise) |
+| `Specialization` → Given / Missing | 0.8186 | +0.0010 (noise) |
+| Drop `Specialization` entirely | 0.8165 | −0.0011: kept as Given / Missing instead |
+
+**Rule:** when a simpler version scores the same (difference well inside ± 0.011), the simpler version wins. All five simplifications together:
+
+| Features | Count | CV PR-AUC | CV ROC-AUC | CV Brier | CV precision top 20% | CV recall top 20% |
+|---|---|---|---|---|---|---|
+| All | 51 | 0.8176 ± 0.0108 | 0.8679 | 0.1402 | 86.3% | 44.8% |
+| **Selected** | **24** | **0.8176 ± 0.0109** | **0.8691** | **0.1404** | **85.7%** | **44.5%** |
+
+Same quality with half the features, and the API needs 4 fewer input fields. Details: [features.md](features.md).
+
+**Validation with the selected features** (`make baselines`):
+
+| Model | PR-AUC | ROC-AUC | Brier | Precision top 20% | Recall top 20% | Recall top 50% |
+|---|---|---|---|---|---|---|
+| Logistic Regression, all features (step 2.3) | 0.840 | 0.887 | 0.130 | 88.9% | 46.2% | 87.4% |
+| **Logistic Regression, selected features** | **0.839** | **0.887** | **0.130** | **88.7%** | **46.1%** | **87.4%** |

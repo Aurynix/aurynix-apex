@@ -28,9 +28,13 @@ from apex.data.load import load_raw
 
 
 def add_features(df: pd.DataFrame, config: dict[str, Any] | None = None) -> pd.DataFrame:
-    """Add engineered features and drop redundant columns (stateless)."""
+    """Add engineered features, drop unused columns, and reduce some columns to
+    "Given" / "Missing" (stateless)."""
     cfg = (config or load_config())["features"]
     df = df.copy()
+    for col in cfg["presence_only"]:
+        if col in df.columns:
+            df[col] = df[col].where(df[col] == "Missing", "Given")
     visits = df["TotalVisits"]
     df["time_per_visit"] = (df["Total Time Spent on Website"] / visits.where(visits > 0)).fillna(0)
     df["has_web_activity"] = (visits > 0).astype(int)

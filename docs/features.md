@@ -3,7 +3,7 @@
 > Stage 5 (step 2.1). Code: [`src/apex/data/features.py`](../src/apex/data/features.py). Ideas and evidence: [eda.md](eda.md).
 
 ```bash
-make features   # fit the pipeline on all leads and list the 51 features
+make features   # fit the pipeline on all leads and list the 24 features
 ```
 
 ---
@@ -13,14 +13,14 @@ make features   # fit the pipeline on all leads and list the 51 features
 One sklearn `Pipeline` goes from **raw lead rows** (as in `Leads.csv`, without `Converted`) to a **numeric matrix** the model can use:
 
 ```
-raw lead ─► clean() ─► add_features() ─► scale numbers + one-hot encode text ─► 51 numbers
+raw lead ─► clean() ─► add_features() ─► scale numbers + one-hot encode text ─► 24 numbers
             stateless   stateless          learned on the training split only
 ```
 
 | Step | What it does | Learns from data? |
 |---|---|---|
 | `clean` | All cleaning rules ([data_cleaning.md](data_cleaning.md)) | No |
-| `add_features` | Adds 2 features, drops 1 redundant column | No |
+| `add_features` | Adds 2 features, drops 5 columns, reduces `Specialization` to Given / Missing | No |
 | `StandardScaler` | Numbers → mean 0, standard deviation 1 (helps Logistic Regression) | **Yes**: mean and scale |
 | `OneHotEncoder` | Each text value → its own 0/1 column | **Yes**: which values are frequent |
 
@@ -33,11 +33,17 @@ Because the whole path is one object, the API can pass a raw lead straight in, a
 | `time_per_visit` | time on site ÷ visits; 0 when there are no visits | Visit counts alone are flat (29%–43%), time is strong; this separates long, focused visits from quick ones |
 | `has_web_activity` | 1 if visits > 0, else 0 | Leads with no web activity are a different group (API and Lead Add Form) |
 
-## Removed
+## Removed and simplified
 
-| Column | Why |
-|---|---|
-| `What matters most to you in choosing a course` | Duplicate: missing for the same leads as occupation (99.3% overlap), and when present it is "Better Career Prospects" in 99.95% of rows |
+| Column | Change | Why |
+|---|---|---|
+| `What matters most to you in choosing a course` | Drop (step 2.1) | Duplicate: missing for the same leads as occupation (99.3% overlap), and when present it is "Better Career Prospects" in 99.95% of rows |
+| `Page Views Per Visit` | Drop (step 2.4) | 0.85 correlated with visits, no signal of its own |
+| `City`, `Country` | Drop (step 2.4) | Weak signal |
+| `A free copy of Mastering The Interview` | Drop (step 2.4) | Very weak signal (40% vs. 36%) |
+| `Specialization` | Given / Missing (step 2.4) | Only presence matters (29% vs. 35–49%); 18 values → 2 |
+
+Step 2.4 changes were each tested with 5-fold CV on the train split: none lowers PR-AUC beyond noise, so the simpler set wins. Evidence: [models.md](models.md) step 2.4. Settings: `config.json → features.drop` and `features.presence_only`.
 
 ## Rare and unseen categories
 
@@ -57,18 +63,16 @@ Because the whole path is one object, the API can pass a raw lead straight in, a
 
 The new features add a little. Dropping `What matters most…` changes nothing beyond noise, so the simpler version is kept.
 
-## Final features (51)
+## Final features (24, after step 2.4)
+
+The model needs **7 raw fields** from a lead: `Lead Origin`, `Lead Source`, `Do Not Email`, `TotalVisits`, `Total Time Spent on Website`, `Specialization`, `What is your current occupation`.
 
 | Group | Columns |
 |---|---|
-| Numeric (7) | `TotalVisits`, `Total Time Spent on Website`, `Page Views Per Visit`, `time_per_visit`, `has_web_activity`, `Do Not Email`, `A free copy of Mastering The Interview` |
+| Numeric (5) | `TotalVisits`, `Total Time Spent on Website`, `time_per_visit`, `has_web_activity`, `Do Not Email` |
 | `Lead Origin` (4) | API, Landing Page Submission, Lead Add Form, infrequent |
 | `Lead Source` (8) | Direct Traffic, Google, Olark Chat, Organic Search, Reference, Referral Sites, Welingak Website, infrequent |
-| `Country` (3) | India, Other, Missing |
-| `Specialization` (17) | 15 specializations, Missing, infrequent |
+| `Specialization` (2) | Given, Missing |
 | `What is your current occupation` (5) | Unemployed, Working Professional, Student, Missing, infrequent |
-| `City` (7) | 6 cities, Missing, infrequent (with `Tier II Cities`) |
 
-## Left for later
-
-From [eda.md](eda.md), tested in steps 2.3–2.4 with PR-AUC before any change: drop `Page Views Per Visit`; `Specialization` → present / missing; drop `City`, `Country`, the free-book flag.
+Step 2.1 had 51 features; the quick check below is from that version.

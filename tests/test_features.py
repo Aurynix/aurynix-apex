@@ -61,3 +61,14 @@ def test_pipeline_learns_from_training_rows_only(raw):
     names = list(pipeline[-1].get_feature_names_out())
     col = names.index("Total Time Spent on Website")
     assert pipeline.transform(new)[:, col].mean() > 3
+
+
+def test_add_features_reduces_presence_only_columns():
+    df = pd.DataFrame(
+        {
+            "TotalVisits": [1, 1],
+            "Total Time Spent on Website": [5, 5],
+            "Specialization": ["Finance Management", "Missing"],
+        }
+    )
+    assert add_features(df)["Specialization"].tolist() == ["Given", "Missing"]

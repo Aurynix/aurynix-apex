@@ -115,7 +115,7 @@ The main question: **what share of all conversions lands in the High segment?**
 | **Hidden missing values** (`"Select"`) | Biased features; misleading EDA | Treated as missing in `clean.py` (`config.json → data.missing_placeholders`) |
 | **Snapshot data without timestamps** | Cannot prove when activity happened | Conservative feature choice; documented limitation |
 | **Dataset not representative** (one company, one period) | Results may not carry over to Aurynix Pulse clients | Re-validate on Bank Marketing data; drift monitoring |
-| **Class imbalance** (moderate here, severe in Bank Marketing) | Accuracy looks good while ranking is poor | PR-AUC as the primary metric; class weights compared with resampling |
+| **Class imbalance** (moderate here, severe in Bank Marketing) | Accuracy looks good while ranking is poor | PR-AUC as the primary metric; class weights tested in tuning (step 2.5) |
 | **Feedback loop** (only High leads get called, so mostly they convert) | Future labels become biased toward the model's own choices | Future: keep a small random-contact sample when the `outcomes` table is built |
 
 ## 10. Open questions

@@ -124,19 +124,20 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `src/apex/models/evaluate.py`, `src/apex/models/train.py`, `tests/test_evaluate.py`, `tests/test_train.py`, `docs/models.md`, `docs/decisions.md` (ADR-003), `Makefile`
 - **Done when:** baseline metrics are logged in MLflow and become the bar to beat.
 
-### 2.4 Model comparison — *Stage 8*
-- [ ] Random Forest, XGBoost, LightGBM with sensible defaults.
-- [ ] Stratified K-fold CV in `cv.py`; `make cv`.
-- [ ] Comparison table (mean ± std per metric) from MLflow.
-- **Files:** `src/apex/models/cv.py`
-- **Done when:** every candidate is compared on the same folds and logged in MLflow.
+### 2.4 Cross-validation & feature selection — *Stage 8* ✅
+> Changed after ADR-003 (Logistic Regression is the model): instead of comparing model families, this step makes the evaluation stable and simplifies the features.
+- [x] Stratified 5-fold CV on the train split in `cv.py`; `make cv`; mean ± std logged in MLflow.
+- [x] Test the EDA feature ideas (drop `Page Views Per Visit`, `City`, `Country`, free-book flag; `Specialization` → present / missing); keep a simplification when CV PR-AUC does not drop.
+- [x] Record the result in `docs/models.md` and `docs/features.md`.
+- **Files:** `src/apex/models/cv.py`, `tests/test_cv.py`, `src/apex/data/features.py`, `config.json`, `docs/models.md`, `docs/features.md`
+- **Done when:** the selected features are justified by CV mean ± std and logged in MLflow.
 
-### 2.5 Imbalance handling & tuning — *Stage 9*
-- [ ] Compare class weights vs. resampling (inside CV folds only).
-- [ ] Optuna tuning of the top 1–2 models, optimizing CV PR-AUC.
+### 2.5 Tuning — *Stage 9*
+- [ ] Grid search over Logistic Regression settings with CV on the train split: regularization strength `C`, `class_weight` (none vs. balanced).
+- [ ] Confirm the best settings on the validation split.
 - [ ] Record the choice in `docs/decisions.md`.
-- **Files:** `src/apex/models/train.py`, `src/apex/models/cv.py`, `docs/decisions.md`
-- **Done when:** a tuned model beats the baselines on validation, and the choice is justified in an ADR.
+- **Files:** `src/apex/models/cv.py`, `src/apex/models/train.py`, `docs/decisions.md`
+- **Done when:** the tuned model is at least as good as the baseline on validation, and the choice is justified in an ADR.
 
 ---
 
@@ -248,3 +249,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | 2.1 | Feature pipeline (`make features`): clean → `time_per_visit`, `has_web_activity`, drop "what matters most" → scale + one-hot (rare/unseen → infrequent); 36 raw columns → 51 features; quick CV PR-AUC 0.810 → 0.816. |
 | 2026-10-05 | 2.2 | Stratified 60/20/20 split (`make split`) saved as `data/splits.csv`; conversion 38.5% in every split; `load_splits()` hides test unless `include_test=True`; 22% of val/test leads have a look-alike in train (kept, documented). |
 | 2026-10-06 | 2.3 | Baselines (`make baselines`, MLflow on SQLite): no skill PR-AUC 0.385 vs. Logistic Regression **0.840** on validation; top 20% captures 46.2% of buyers (target ≥ 40%), top 50% 87.4%; LR chosen as the model (ADR-003). |
+| 2026-10-06 | 2.4 | Plan changed for Logistic Regression (ADR-003). 5-fold CV on train (`make cv`): selected features (24) give the same PR-AUC as all features (51), 0.8176 ± 0.011; dropped `Page Views Per Visit`, `City`, `Country`, free-book flag; `Specialization` → Given / Missing. Validation PR-AUC 0.839. |

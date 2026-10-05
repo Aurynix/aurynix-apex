@@ -84,7 +84,14 @@
     "rare_category_min_share": 0.01
   },
   "features": {
-    "drop": ["What matters most to you in choosing a course"]
+    "drop": [
+      "What matters most to you in choosing a course",
+      "Page Views Per Visit",
+      "City",
+      "Country",
+      "A free copy of Mastering The Interview"
+    ],
+    "presence_only": ["Specialization"]
   },
   "split": {
     "random_state": 42,
