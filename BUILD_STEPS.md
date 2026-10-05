@@ -195,18 +195,17 @@ The step's checkbox and **Log** entry are updated in the same branch.
 ### 4.2 Prediction endpoints & logging ✅
 - [x] Merged into 4.1 (single + batch endpoints, logging, API tests). CSV upload for batch scoring stays with `make predict` for now.
 
-### 4.3 Training job endpoint
-- [ ] `/pipeline/train` starts a background job; `/pipeline/jobs/{id}` reports status.
-- **Files:** `src/apex/api/routers/pipeline.py`
+### 4.3 Training job endpoint ⏭️ skipped
+- [x] Skipped on purpose (KISS): training stays a separate workflow (`make train`), and the API only loads saved artifacts. Revisit if retraining must be triggered from the product.
 
-### 4.4 Drift monitoring — *Stage 14*
-- [ ] `drift.py`: PSI for numeric (fixed bins) and categorical features, with smoothing for empty bins; unit tests with known values.
-- [ ] `monitor.py`: `run_monitoring()` — window, `min_samples` check, feature drift + score drift, statuses.
-- [ ] `drift_runs` and `feature_drift` tables; `make monitor`.
-- [ ] Monitoring endpoints: `/monitoring/run`, `/latest`, `/history`, `/features/{name}`.
-- [ ] Optional Evidently HTML report to `reports/monitoring/`.
-- [ ] Simulation: feed shifted leads and confirm drift is detected.
-- **Files:** `src/apex/monitoring/`, `src/apex/api/routers/monitoring.py`, `tests/test_drift.py`
+### 4.4 Drift monitoring — *Stage 14* ✅
+- [x] `drift.py`: PSI for numeric (fixed bins) and categorical features (unseen → `__other__`), with smoothing for empty bins; unit tests with known values.
+- [x] `monitor.py`: `Monitor.run()` with window and `min_samples` check; three checks: **feature drift**, **prediction drift** (score PSI + High / Medium / Low shares), **data quality** (missing rates, unseen categories, leads relying on defaults, rejected requests); statuses.
+- [x] SQLite `drift_runs` (full report as JSON) and `rejected_requests` (logged by the API); `make monitor`; `reports/monitoring/latest.json`.
+- [x] Monitoring endpoints: `POST /monitoring/run`, `GET /monitoring/latest`, `GET /monitoring/history` (per-feature history is inside each report).
+- [x] Simulation (`make drift-demo`): stable traffic → ok, shifted traffic → drift.
+- [x] Evidently HTML report: skipped (own PSI + JSON report cover it, no extra dependency).
+- **Files:** `src/apex/monitoring/`, `src/apex/api/` (database, app, dependencies, routers/monitoring.py), `tests/test_drift.py`, `tests/test_monitor.py`, `tests/test_api.py`, `tests/conftest.py`, `docs/monitoring.md`, `config.json`, `Makefile`
 - **Done when:** a simulated shift is flagged, and stable data is not.
 
 ### 4.5 Docker & Streamlit demo
@@ -257,3 +256,5 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 3.4 | Explainability (`make explain`): exact linear SHAP (weight × (value − mean)), matches `shap.LinearExplainer`; one-hot and the 4 website inputs grouped into readable reasons; top drivers: website activity, occupation, lead origin, specialization; agrees with EDA; `Explainer.explain_one(lead)` returns probability + top reasons up / down. |
 | 2026-10-06 | 3.5 | `make train` fits the final model on all 9,240 leads and saves `model.pkl`, `model_meta.json`, `reference_profile.json`, `model_card.json` (risk rating Low); thresholds from out-of-fold scores on all rows (High ≥ 0.746, Medium ≥ 0.275); `make predict` → `data/predictions.csv`; `make pipeline` runs end to end. |
 | 2026-10-06 | 4.1 (+4.2) | API serving (`make run`): `/health`, `/model/info`, `/predict/single`, `/predict/batch`; thin routers + `ScoringService` (score → segment → explain → log to SQLite); model loaded once at startup, never trained in the API; fixed: missing visits with 0 time on site → 0 visits (as in training). 80 tests. |
+| 2026-10-06 | 4.3 | Skipped: training stays `make train`; the API never trains. |
+| 2026-10-06 | 4.4 | Drift monitoring (`make monitor`, `/monitoring/*`): feature drift (PSI), prediction drift (score PSI + segment shares), data quality (missing, unseen, defaults, rejected requests). Simulation (`make drift-demo`): stable → ok (all PSI ≤ 0.02); new-campaign shift → drift (Lead Source 2.54, time on site 1.31, High 20% → 7%). Tests no longer need saved artifacts (shared synthetic fixtures). 92 tests. |

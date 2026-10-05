@@ -1,17 +1,9 @@
-import sqlite3
-
-import numpy as np
-import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
 from apex.api.app import create_app
-from apex.api.database import SCHEMA
 from apex.api.schemas import Lead
-from apex.api.service import ScoringService
 from apex.config import load_config
-from apex.models.explain import Explainer
-from apex.models.train import make_model
 
 LEAD = {
     "lead_origin": "Landing Page Submission",
@@ -25,40 +17,8 @@ LEAD = {
 
 
 @pytest.fixture
-def service():
-    """A ScoringService with a small model trained on synthetic leads and an in-memory DB."""
-    rng = np.random.default_rng(0)
-    n = 300
-    time = rng.integers(0, 2000, n)
-    leads = pd.DataFrame(
-        {
-            "Lead Origin": rng.choice(["API", "Landing Page Submission", "Lead Add Form"], n),
-            "Lead Source": rng.choice(["Google", "Direct Traffic"], n),
-            "Do Not Email": rng.choice(["Yes", "No"], n),
-            "TotalVisits": np.where(time > 0, 3.0, 0.0),
-            "Total Time Spent on Website": time,
-            "Specialization": rng.choice(["Finance Management", None], n),
-            "What is your current occupation": rng.choice(["Working Professional", None], n),
-        }
-    )
-    model = make_model().fit(leads, (time > 1000).astype(int))
-    meta = {
-        "model_version": "apex-test",
-        "trained_at": "2026-10-06T00:00:00+00:00",
-        "data": {"rows": n},
-        "input_fields": load_config()["serving"]["input_fields"],
-        "segments": {"thresholds": {"high": 0.75, "medium": 0.3}},
-        "performance": {"test": {"pr_auc": 0.9}},
-        "explainer_means": dict(enumerate(Explainer.fit(model, leads).means)),
-    }
-    db = sqlite3.connect(":memory:", check_same_thread=False)
-    db.execute(SCHEMA)
-    return ScoringService(model, meta, db)
-
-
-@pytest.fixture
-def client(service):
-    with TestClient(create_app(service)) as client:
+def client(service, monitor):
+    with TestClient(create_app(service, monitor)) as client:
         yield client
 
 
@@ -70,10 +30,10 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok", "model_version": "apex-test"}
 
 
-def test_model_info(client):
+def test_model_info(client, service):
     info = client.get("/model/info").json()
     assert info["model_version"] == "apex-test"
-    assert info["segment_thresholds"] == {"high": 0.75, "medium": 0.3}
+    assert info["segment_thresholds"] == service.meta["segments"]["thresholds"]
     assert len(info["input_fields"]) == 7
 
 
@@ -127,3 +87,17 @@ def test_lead_maps_to_the_model_input_fields():
 def test_no_time_on_site_means_zero_visits():
     assert Lead(lead_origin="Lead Add Form").to_row()["TotalVisits"] == 0
     assert Lead(lead_origin="API", time_on_website=600).to_row()["TotalVisits"] is None
+
+
+def test_invalid_requests_are_logged_for_monitoring(client, service):
+    client.post("/predict/single", json={**LEAD, "total_visits": -1})
+    assert service.db.execute("SELECT COUNT(*) FROM rejected_requests").fetchone()[0] == 1
+
+
+def test_monitoring_endpoints(client):
+    assert client.get("/monitoring/latest").status_code == 404
+    client.post("/predict/batch", json={"leads": [LEAD] * 10})
+    report = client.post("/monitoring/run").json()
+    assert report["status"] == "insufficient_data"  # 10 < 50
+    assert client.get("/monitoring/latest").json()["id"] == report["id"]
+    assert client.get("/monitoring/history").json()[0]["status"] == "insufficient_data"

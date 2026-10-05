@@ -50,6 +50,9 @@ Routers do not know how the model works.
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
 | `POST` | `/predict/batch` | Score up to 10,000 leads (results keep input order) |
+| `POST` | `/monitoring/run` | Run drift monitoring now ([monitoring.md](monitoring.md)) |
+| `GET` | `/monitoring/latest` | Latest drift report |
+| `GET` | `/monitoring/history` | Status and key numbers of past runs |
 
 Reasons are part of every prediction, so a client never has to call a second endpoint to explain a score.
 
@@ -65,7 +68,7 @@ Reasons are part of every prediction, so a client never has to call a second end
 | `specialization` | string | no | Only "given" vs. "missing" matters to the model |
 | `occupation` | string | no | e.g. `Working Professional`, `Unemployed`, `Student` |
 
-Unknown fields and negative numbers are rejected with `422`. Unknown category values (e.g. a new lead source) are accepted: the model treats them as rare.
+Unknown fields and negative numbers are rejected with `422`, and each rejected request is logged in `rejected_requests` (a data-quality signal for monitoring). Unknown category values (e.g. a new lead source) are accepted: the model treats them as rare.
 
 ## Examples
 
@@ -135,4 +138,4 @@ Every scored lead is saved in `data/apex.db` (`config.json → paths.database`),
 | `score` | 0.9568 |
 | `segment` | `high` |
 
-Drift monitoring (step 4.4) reads this table.
+Drift monitoring reads this table ([monitoring.md](monitoring.md)).

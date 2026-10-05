@@ -1,12 +1,16 @@
-"""SQLite log of every scored lead (`config.json → paths.database`).
+"""SQLite storage (`config.json → paths.database`).
 
-One table for now: `predictions`. Drift monitoring (step 4.4) reads it later.
+Tables:
+- `predictions`: every scored lead (input fields, score, segment)
+- `rejected_requests`: requests the API refused as invalid (422), for data quality
+- `drift_runs`: one row per monitoring run, with the full report as JSON
 """
 
 import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS predictions (
@@ -16,16 +20,38 @@ CREATE TABLE IF NOT EXISTS predictions (
     lead          TEXT NOT NULL,
     score         REAL NOT NULL,
     segment       TEXT NOT NULL
-)
+);
+CREATE TABLE IF NOT EXISTS rejected_requests (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    errors     TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS drift_runs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    n_samples  INTEGER NOT NULL,
+    status     TEXT NOT NULL,
+    score_psi  REAL,
+    report     TEXT NOT NULL
+);
 """
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    """Open the database (created on first use) and make sure the table exists."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    conn.execute(SCHEMA)
+def now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def init_db(conn: sqlite3.Connection) -> sqlite3.Connection:
+    """Create the tables if they do not exist yet."""
+    conn.executescript(SCHEMA)
     return conn
+
+
+def connect(db_path: Path) -> sqlite3.Connection:
+    """Open the database (created on first use) with all tables."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return init_db(sqlite3.connect(db_path, check_same_thread=False))
 
 
 def log_predictions(
@@ -36,13 +62,61 @@ def log_predictions(
     version: str,
 ) -> None:
     """Save one row per scored lead: the input fields, the score, and the segment."""
-    now = datetime.now(UTC).isoformat(timespec="seconds")
+    created = now()
     conn.executemany(
         "INSERT INTO predictions (created_at, model_version, lead, score, segment) "
         "VALUES (?, ?, ?, ?, ?)",
         [
-            (now, version, json.dumps(row), score, segment)
+            (created, version, json.dumps(row), score, segment)
             for row, score, segment in zip(rows, scores, segments, strict=True)
         ],
     )
     conn.commit()
+
+
+def log_rejection(conn: sqlite3.Connection, path: str, errors: list[dict]) -> None:
+    """Save a request the API refused as invalid."""
+    conn.execute(
+        "INSERT INTO rejected_requests (created_at, path, errors) VALUES (?, ?, ?)",
+        (now(), path, json.dumps(errors, default=str)),
+    )
+    conn.commit()
+
+
+def read_predictions(conn: sqlite3.Connection, since: str) -> list[tuple[dict, float, str]]:
+    """(lead, score, segment) for every prediction logged at or after `since`."""
+    rows = conn.execute(
+        "SELECT lead, score, segment FROM predictions WHERE created_at >= ?", (since,)
+    ).fetchall()
+    return [(json.loads(lead), score, segment) for lead, score, segment in rows]
+
+
+def count_rejections(conn: sqlite3.Connection, since: str) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) FROM rejected_requests WHERE created_at >= ?", (since,)
+    ).fetchone()[0]
+
+
+def save_drift_run(conn: sqlite3.Connection, report: dict[str, Any]) -> int:
+    """Store a monitoring report; returns its id."""
+    cursor = conn.execute(
+        "INSERT INTO drift_runs (created_at, n_samples, status, score_psi, report) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            report["created_at"],
+            report["n_samples"],
+            report["status"],
+            report.get("prediction", {}).get("score_psi"),
+            json.dumps(report),
+        ),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def drift_runs(conn: sqlite3.Connection, limit: int = 30) -> list[dict[str, Any]]:
+    """Latest monitoring reports, newest first."""
+    rows = conn.execute(
+        "SELECT id, report FROM drift_runs ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [{"id": run_id, **json.loads(report)} for run_id, report in rows]
