@@ -266,12 +266,9 @@ make run     # → http://localhost:8000/docs
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
 | `POST` | `/predict/batch` | Score a list of leads (up to 10,000) |
-| `POST` | `/pipeline/train` | Start a training job *(planned, step 4.3)* |
-| `GET` | `/pipeline/jobs/{id}` | Check job status *(planned, step 4.3)* |
-| `POST` | `/monitoring/run` | Run drift monitoring now *(planned, step 4.4)* |
-| `GET` | `/monitoring/latest` | Latest drift result *(planned, step 4.4)* |
-| `GET` | `/monitoring/history` | Score drift over time *(planned, step 4.4)* |
-| `GET` | `/monitoring/features/{name}` | Drift history for one feature *(planned, step 4.4)* |
+| `POST` | `/monitoring/run` | Run drift monitoring now |
+| `GET` | `/monitoring/latest` | Latest drift report |
+| `GET` | `/monitoring/history` | Status and score drift over time |
 
 **Response of `/predict/single`** (reasons are always included, so there is no separate explain call):
 
@@ -309,34 +306,49 @@ Saved by `train.py` to `models/reference_profile.json`:
 
 Bin edges are fixed at training time and reused for all future comparisons.
 
-### Metric: Population Stability Index (PSI)
+### Three checks
+
+| Check | What it compares | Example signal |
+|---|---|---|
+| **Feature drift** | PSI of each model input (time on site, visits, occupation, lead origin, lead source, …) vs. training | a new source, much shorter visits |
+| **Prediction drift** | PSI of the score, and High / Medium / Low shares vs. training (20 / 30 / 50) | High 47% / Medium 38% / Low 15% |
+| **Data quality** | missing rate per field, unseen categories, leads relying on defaults, invalid requests rejected by the API | occupation missing 29% → 66% |
 
 | PSI | Status | Action |
 |---|---|---|
-| < 0.10 | 🟢 Stable | None |
-| 0.10 – 0.25 | 🟡 Warning | Investigate |
-| > 0.25 | 🔴 Drift | Consider retraining |
+| < 0.10 | 🟢 ok | None |
+| 0.10 – 0.25 | 🟡 warning | Investigate |
+| ≥ 0.25 | 🔴 drift | Find the cause; consider retraining |
 
-- **Data drift:** PSI per feature, plus changes in missing rate and the share of unseen categories (grouped as `__other__`).
-- **Score drift:** PSI of the predicted probability distribution, plus changes in mean score and High-segment share.
-- A minimum of **200 predictions** is required per run; otherwise the run is marked `insufficient_data`.
+A minimum of **200 predictions** is required per run; otherwise the run is marked `insufficient_data`.
 
-### Storage (SQLite)
+### Does it work? (`make drift-demo`)
+
+2,000 real leads scored by the real service, then the same leads after a simulated "new campaign" (30% from a new source, half the time on site, more skipped occupation questions):
+
+| | Stable | Drifted |
+|---|---|---|
+| Status | 🟢 ok | 🔴 drift |
+| Lead Source / time on site / occupation PSI | 0.008 / 0.003 / 0.002 | **2.54 / 1.31 / 0.57** |
+| High / Medium / Low | 19% / 32% / 49% | **7% / 16% / 77%** |
+
+### Storage (SQLite, `data/apex.db`)
 
 | Table | One row per | Key columns |
 |---|---|---|
-| `predictions` | Scored lead | timestamp, model_version, features (JSON), probability, segment |
-| `drift_runs` | Monitoring run | window, n_samples, **score_psi**, mean score (ref/cur), High share (ref/cur), n_features_drifted, status |
-| `feature_drift` | Feature per run | feature, type, **psi**, missing rate (ref/cur), unseen_share, status |
+| `predictions` | Scored lead | created_at, model_version, lead (JSON), score, segment |
+| `rejected_requests` | Invalid request (422) | created_at, path, errors |
+| `drift_runs` | Monitoring run | created_at, n_samples, status, score_psi, full report (JSON) |
 | `outcomes` *(planned)* | Known result | prediction_id, converted, recorded_at |
 
 ### Running it
 
 ```bash
-make monitor            # analyze the last 7 days of predictions
+make monitor      # check the last 7 days of API predictions
+make drift-demo   # stable vs. drifted simulation
 ```
 
-Optional Evidently HTML reports are saved to `reports/monitoring/`. Core PSI values are computed by the project's own code and stored in SQLite.
+API: `POST /monitoring/run`, `GET /monitoring/latest`, `GET /monitoring/history`. The latest report is also saved to `reports/monitoring/latest.json`. Details: [docs/monitoring.md](docs/monitoring.md).
 
 ### Next step: real performance
 
@@ -366,7 +378,9 @@ Drift shows that the **data** changed, not that the model is **wrong**. Once con
 ```
 aurynix-apex/
 ├── data/                          # git-ignored
-│   └── raw/                       # Leads.csv (the only copy; cleaned in memory)
+│   ├── raw/                       # Leads.csv (the only copy; cleaned in memory)
+│   ├── splits.csv                 # fixed train / val / test split
+│   └── apex.db                    # SQLite: predictions, rejected requests, drift runs
 ├── docs/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
@@ -377,37 +391,43 @@ aurynix-apex/
 │   ├── splits.md                  # train / val / test split
 │   ├── models.md                  # metrics & model results
 │   ├── decisions.md               # architecture decision records
-│   ├── api.md
+│   ├── api.md                     # API design & reference
+│   ├── monitoring.md              # drift monitoring & simulation
 │   └── deployment.md
 ├── notebooks/                     # local scratch for testing (git-ignored)
 ├── src/
 │   └── apex/
 │       ├── config.py              # loads config.json
 │       ├── data/
+│       │   ├── download.py        # Kaggle download
 │       │   ├── load.py
 │       │   ├── clean.py
-│       │   └── features.py
+│       │   ├── leakage.py         # with/without leakage check
+│       │   ├── eda.py
+│       │   ├── features.py        # feature pipeline
+│       │   └── split.py
 │       ├── models/
-│       │   ├── train.py
-│       │   ├── cv.py
-│       │   ├── evaluate.py
-│       │   ├── segment.py
-│       │   ├── explain.py
-│       │   └── predict.py
+│       │   ├── train.py           # baselines, test, calibration, final model
+│       │   ├── cv.py              # cross-validation & tuning
+│       │   ├── evaluate.py        # metrics & charts
+│       │   ├── segment.py         # High / Medium / Low
+│       │   ├── explain.py         # per-lead reasons
+│       │   ├── card.py            # model card
+│       │   └── predict.py         # load model, batch scoring
 │       ├── monitoring/
 │       │   ├── reference.py       # build reference_profile.json
-│       │   ├── drift.py           # PSI functions & thresholds
-│       │   └── monitor.py         # run_monitoring()
+│       │   ├── drift.py           # PSI functions & statuses
+│       │   ├── monitor.py         # feature drift, prediction drift, data quality
+│       │   └── simulate.py        # stable vs. drifted traffic demo
 │       └── api/
-│           ├── app.py
-│           ├── schemas.py
-│           ├── dependencies.py    # model & SHAP explainer singletons
+│           ├── app.py             # app, startup, /health
+│           ├── schemas.py         # request / response validation
+│           ├── dependencies.py    # load model once, inject services
+│           ├── service.py         # ScoringService: score, segment, explain, log
 │           ├── database.py        # SQLite tables
 │           └── routers/
-│               ├── health.py
 │               ├── model.py
 │               ├── predict.py
-│               ├── pipeline.py
 │               └── monitoring.py
 ├── app/
 │   └── demo.py                    # Streamlit demo
@@ -482,7 +502,8 @@ Run `make help` for the full list.
 | | `make pipeline` | `split` + `train` + `predict`, end to end |
 | Serving | `make run` / `make run-prod` | Start the API with the saved model (dev with reload / prod with 2 workers) |
 | | `make demo` | Start Streamlit demo |
-| Monitoring | `make monitor` | Run drift monitoring |
+| Monitoring | `make monitor` | Drift monitoring on the last 7 days of API predictions |
+| | `make drift-demo` | Simulate stable vs. drifted traffic; only the drift is flagged |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
 | Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build / start / stop |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
@@ -519,7 +540,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 ### Week 4: Ship & Monitor
 - [x] FastAPI service with prediction logging
 - [x] Reference profile at training time
-- [ ] Data drift and score drift monitoring
+- [x] Data drift and score drift monitoring
 - [ ] Docker and Streamlit demo
 - [ ] Final documentation
 

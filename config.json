@@ -125,6 +125,9 @@
     "n_bins": 10,
     "window_days": 7,
     "min_samples": 200,
+    "missing_rate_change_warning": 0.1,
+    "unseen_share_warning": 0.05,
+    "rejection_rate_warning": 0.05,
     "unseen_category_label": "__other__"
   }
 }
