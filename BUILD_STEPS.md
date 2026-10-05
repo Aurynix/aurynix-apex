@@ -89,12 +89,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `docs/data_dictionary.md`, `config.json`, `docs/decisions.md` (ADR), `src/apex/data/leakage.py`, `tests/test_leakage.py`
 - **Done when:** every column has a status and the leakage decision is recorded as an ADR.
 
-### 1.5 EDA report — *Stage 3 (part 2)*
-- [ ] Univariate distributions; conversion rate by each categorical feature; numeric features vs. target.
-- [ ] Correlations and redundant features.
-- [ ] Save key figures to `reports/figures/`.
-- [ ] Write findings and the resulting feature ideas.
-- **Files:** `notebooks/01_eda.ipynb`, `reports/figures/`
+### 1.5 EDA report — *Stage 3 (part 2)* ✅
+- [x] Univariate distributions; conversion rate by each categorical feature; numeric features vs. target.
+- [x] Correlations and redundant features.
+- [x] Save key figures to `reports/figures/`.
+- [x] Write findings and the resulting feature ideas.
+- **Files:** `docs/eda.md`, `src/apex/data/eda.py`, `tests/test_eda.py`, `reports/figures/eda_*.png`
 - **Done when:** there is a clear list of findings that drive feature engineering.
 
 ---
@@ -243,3 +243,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-05 | 1.4 | Leakage audit: 9 post-contact columns dropped (`Tags` alone adds +0.148 PR-AUC); quick-model base PR-AUC 0.804 vs. 0.385 random; `make leakage`; ADR-001; cleaned data → 9,240 × 14. |
 | 2026-10-05 | — | Full cleaning: missing values filled (`"Missing"`, fixed medians), `How did you hear…` dropped (78.5% empty), outliers capped (30 / 15), `Country` → India / Other, integer types, logic check; `docs/data_cleaning.md`, ADR-002; cleaned data → 9,240 × 13, 0 nulls. |
 | 2026-10-05 | — | Removed `data/interim/` and `data/processed/`: cleaning runs in memory with `clean(load_raw())`; `make preprocess` removed. |
+| 2026-10-05 | 1.5 | EDA (`make eda`): time on site is the strongest numeric (14% → 69%), visits/page views flat; Lead Add Form 92.5%, Working Professional 92%, occupation missing 14%; "what matters most" duplicates occupation missingness; 7 feature ideas for 2.1 in `docs/eda.md`. |

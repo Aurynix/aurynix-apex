@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage train cv predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda train cv predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -31,6 +31,9 @@ data-info: ## Print shape, hash, and target rate of data/raw/Leads.csv
 
 leakage: ## Compare a quick model with and without leakage suspects
 	$(RUN) python -m apex.data.leakage
+
+eda: ## Print EDA tables and save figures to reports/figures/
+	$(RUN) python -m apex.data.eda
 
 train: ## Train model, save artifacts and reference profile
 	$(todo)
