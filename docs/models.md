@@ -102,3 +102,41 @@ Same quality with half the features, and the API needs 4 fewer input fields. Det
 |---|---|---|---|---|---|---|
 | Logistic Regression, all features (step 2.3) | 0.840 | 0.887 | 0.130 | 88.9% | 46.2% | 87.4% |
 | **Logistic Regression, selected features** | **0.839** | **0.887** | **0.130** | **88.7%** | **46.1%** | **87.4%** |
+
+## Step 2.5: Tuning
+
+```bash
+make tune   # 7 values of C × 2 class weights = 14 setups, 5-fold CV each, logged to MLflow
+```
+
+Logistic Regression has two settings that matter:
+- **`C`**, the regularization strength. Small `C` pushes weights toward zero (simpler, but can underfit); large `C` lets the model follow the data more closely.
+- **`class_weight`**: `none` treats every lead the same; `balanced` gives buyers more weight because they are the smaller class (38.5%).
+
+CV on the train split (best first; ± is PR-AUC std over 5 folds):
+
+| C | class_weight | PR-AUC | ROC-AUC | Brier | Precision top 20% | Recall top 20% |
+|---|---|---|---|---|---|---|
+| 3 | none | 0.8177 ± 0.010 | 0.8689 | 0.1404 | 85.6% | 44.5% |
+| **1** | **none** | **0.8176 ± 0.011** | **0.8691** | **0.1404** | **85.7%** | **44.5%** |
+| 10 | none | 0.8175 ± 0.010 | 0.8688 | 0.1404 | 85.7% | 44.5% |
+| 1 | balanced | 0.8171 ± 0.011 | 0.8690 | 0.1444 | 85.8% | 44.6% |
+| 0.3 | none | 0.8165 ± 0.011 | 0.8687 | 0.1405 | 85.8% | 44.6% |
+| 0.1 | none | 0.8139 ± 0.012 | 0.8679 | 0.1411 | 85.2% | 44.3% |
+| 0.03 | none | 0.8054 ± 0.014 | 0.8655 | 0.1440 | 84.9% | 44.1% |
+| 0.01 | none | 0.7889 ± 0.019 | 0.8598 | 0.1509 | 83.3% | 43.3% |
+
+(Other `balanced` rows follow the same pattern; full table in MLflow.)
+
+What it shows:
+- **`C` ≥ 0.3 is a plateau.** 0.3, 1, 3 and 10 are all within 0.001, far inside the ± 0.011 noise. Only strong regularization (`C` ≤ 0.1) hurts.
+- **`balanced` does not improve the ranking** (PR-AUC 0.8171 vs. 0.8176) but **makes the probabilities worse** (Brier 0.144 vs. 0.140): it inflates every score.
+
+**Validation check** (train → validation):
+
+| Settings | PR-AUC | Brier | Mean predicted probability | Precision / recall at 0.5 | Recall top 20% |
+|---|---|---|---|---|---|
+| **C = 1, none** | **0.839** | **0.130** | **0.393** (actual rate 0.385) | 80.8% / 70.4% | 46.1% |
+| C = 1, balanced | 0.839 | 0.136 | 0.461 | 76.7% / 76.8% | 45.9% |
+
+**Choice: `C = 1`, no class weights** (`config.json → model`, [ADR-004](decisions.md)). It ties for the best ranking, and its probabilities stay honest: on average it predicts 39.3% for a group that converts at 38.5%. The default settings were already the best, so the tuned model equals the step 2.4 model: **validation PR-AUC 0.839, 88.7% precision and 46.1% recall in the top 20%**.

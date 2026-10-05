@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage eda features split baselines train cv predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda features split baselines train cv tune predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -49,7 +49,10 @@ train: ## Train model, save artifacts and reference profile
 	$(todo)
 
 cv: ## 5-fold CV on the train split: all vs. selected features, log to MLflow
-	$(RUN) python -m apex.models.cv
+	$(RUN) python -m apex.models.cv features
+
+tune: ## Grid search over Logistic Regression C and class_weight (5-fold CV), log to MLflow
+	$(RUN) python -m apex.models.cv tune
 
 predict: ## Offline batch scoring
 	$(todo)
