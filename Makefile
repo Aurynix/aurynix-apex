@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments train cv tune predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain train cv tune predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -53,6 +53,9 @@ calibration: ## Step 3.2: out-of-fold calibration check (raw / Platt / isotonic)
 
 segments: ## Step 3.3: derive High / Medium / Low thresholds and print segment tables
 	$(RUN) python -m apex.models.segment
+
+explain: ## Step 3.4: global feature importance, figure, and example per-lead reasons
+	$(RUN) python -m apex.models.explain
 
 train: ## Train model, save artifacts and reference profile
 	$(todo)

@@ -260,3 +260,52 @@ Against the targets ([problem_framing.md](problem_framing.md) 5.1):
 - High holds 43% of conversions with 20% of leads (lift 2.2) ✅.
 
 **Trade-off of the Low segment:** it still contains about 15% of all buyers (110 on test). They are not lost: they get automated emails, and a reply moves them up.
+
+## Step 3.4: Explainability
+
+```bash
+make explain   # global ranking, figure, and example reasons (model fitted on train, explained on validation)
+```
+
+Code: [`explain.py`](../src/apex/models/explain.py).
+
+**Method.** For Logistic Regression, SHAP values have an exact formula:
+
+> contribution of a feature = model weight × (the lead's value − the average lead's value)
+
+measured in log-odds. The contributions of one lead add up exactly to its score (relative to the average lead). This is the same result as `shap.LinearExplainer` (checked in [`tests/test_explain.py`](../tests/test_explain.py)), without running the SHAP library at prediction time.
+
+**Readable reasons.** Model inputs are grouped back into fields a sales rep knows:
+- one-hot columns of a field are summed: 5 occupation columns → `Occupation = Working Professional`;
+- the four website inputs (time on site, visits, time per visit, has visited) are summed into one **Website activity** reason. Shown separately they contradict each other: time on site pushes up (+1.29 weight), but "has visited" pushes down (−0.80) because leads with **no** visit convert more (42%, mostly Lead Add Form) than leads with a **short** visit (14%) ([eda.md](eda.md) section 1).
+
+**Global importance** (average size of each field's contribution, validation split):
+
+![What drives the score](../reports/figures/explain_importance.png)
+
+| Field | Mean \|contribution\| | Agrees with EDA? |
+|---|---|---|
+| Website activity | 0.87 | ✅ time on site is the strongest numeric signal (14% → 69%) |
+| Occupation | 0.61 | ✅ Working Professional 92%, Missing 14% |
+| Lead origin | 0.58 | ✅ Lead Add Form 92.5% |
+| Specialization (Given / Missing) | 0.50 | ✅ Missing 29% vs. 35–49% |
+| Lead source | 0.28 | ✅ Welingak / Reference high; smaller because it overlaps with Lead origin (Cramér's V 0.78) |
+| Opted out of email | 0.20 | ✅ 16% vs. 40% |
+
+No single field dominates, so the leakage alarm in [problem_framing.md](problem_framing.md) 5.3 does not trigger.
+
+**Per-lead reasons** (`Explainer.explain_one(lead)`), three validation leads:
+
+| Lead | Score | Reasons up | Reasons down |
+|---|---|---|---|
+| Highest | 0.997 | Occupation = Working Professional (+2.48) · Lead origin = Lead Add Form (+2.18) · Website activity = 3 visits, 20 min on site (+0.99) | — |
+| Middle | 0.293 | Specialization = Given (+0.40) · Occupation = Unemployed (+0.19) · Opted out of email = no (+0.11) | Lead origin = Landing Page Submission (−0.54) · Website activity = 2 visits, 9 min on site (−0.42) · Lead source = Direct Traffic (−0.09) |
+| Lowest | 0.004 | — | Website activity = 1 visit, 1 min on site (−1.37) · Opted out of email = yes (−1.26) · Occupation = Missing (−1.07) |
+
+`explain_one` returns a dict, ready for the API:
+
+```python
+{"probability": 0.997,
+ "reasons_up": [{"feature": "Occupation", "value": "Working Professional", "impact": 2.48}, ...],
+ "reasons_down": []}
+```

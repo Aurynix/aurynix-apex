@@ -237,8 +237,17 @@ High leads convert **7× more often** than Low leads, and half of the leads (Hig
 
 ## Explainability
 
-- **Global:** SHAP summary plots showing which features drive conversion overall.
-- **Per lead:** the top positive and negative contributors behind each individual score, returned by the API so sales reps can trust and act on the score.
+Every score comes with its reasons. For Logistic Regression, SHAP values are exact and cheap: *weight × (lead's value − average lead's value)*, the same result as `shap.LinearExplainer` ([docs/models.md](docs/models.md) step 3.4).
+
+- **Global:** what drives the score overall: website activity, occupation, lead origin, specialization, lead source, email opt-out.
+- **Per lead:** the top reasons up and down, in words a sales rep knows, returned by the API:
+
+| Score | Reasons up | Reasons down |
+|---|---|---|
+| 0.997 | Occupation = Working Professional · Lead origin = Lead Add Form · 3 visits, 20 min on site | — |
+| 0.004 | — | 1 visit, 1 min on site · Opted out of email · Occupation missing |
+
+![What drives the score](reports/figures/explain_importance.png)
 
 ## API
 
@@ -459,6 +468,7 @@ Run `make help` for the full list.
 | | `make evaluate` | Retrain on train + val, score the test set once, save figure |
 | | `make calibration` | Check probability calibration (raw / Platt / isotonic), save figure |
 | | `make segments` | Derive High / Medium / Low thresholds and print segment tables |
+| | `make explain` | Global feature importance and example per-lead reasons |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -495,7 +505,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Final test-set evaluation
 - [x] Probability calibration
 - [x] High / Medium / Low segmentation
-- [ ] SHAP explainability
+- [x] SHAP explainability
 
 ### Week 4: Ship & Monitor
 - [ ] FastAPI service with prediction logging
