@@ -81,12 +81,12 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - **Files:** `notebooks/01_eda.ipynb`, `src/apex/data/clean.py`, `tests/test_clean.py`, `docs/data_quality.md`, `reports/figures/dq_*.png`
 - **Done when:** cleaning is a tested function (not notebook code) and every issue found has a documented decision.
 
-### 1.4 Leakage audit — *Stage 4*
-- [ ] Classify **every** column: available at lead creation? yes / no / uncertain, with reasoning.
-- [ ] Verify the candidates: `Tags`, `Lead Quality`, `Last Activity`, `Last Notable Activity`, score/index columns.
-- [ ] Put confirmed leakage columns in `config.json → data.leakage_columns`; `clean.py` drops them.
-- [ ] Quick check: train a throwaway model with and without suspect columns and compare (a big jump is evidence of leakage).
-- **Files:** `docs/data_dictionary.md`, `config.json`, `docs/decisions.md` (ADR)
+### 1.4 Leakage audit — *Stage 4* ✅
+- [x] Classify **every** column: available at lead creation? yes / no / uncertain, with reasoning.
+- [x] Verify the candidates: `Tags`, `Lead Quality`, `Last Activity`, `Last Notable Activity`, score/index columns.
+- [x] Put confirmed leakage columns in `config.json → data.leakage_columns`; `clean.py` drops them.
+- [x] Quick check: train a throwaway model with and without suspect columns and compare (a big jump is evidence of leakage).
+- **Files:** `docs/data_dictionary.md`, `config.json`, `docs/decisions.md` (ADR), `src/apex/data/leakage.py`, `tests/test_leakage.py`
 - **Done when:** every column has a status and the leakage decision is recorded as an ADR.
 
 ### 1.5 EDA report — *Stage 3 (part 2)*
@@ -241,3 +241,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-02 | 1.1 | Problem framing: prediction moment, capacity-based segments, business + ML success criteria, risks. |
 | 2026-10-02 | 1.2 | Kaggle download (`make data-download`), loader, source record: 9,240 × 37, conversion rate 38.54%. |
 | 2026-10-02 | 1.3 | Data quality: `"Select"` hides up to 54.6% missing per column; missingness is informative (kept); 12 constant/near-constant columns dropped; stateless `clean.py` → 9,240 × 23; leakage suspects flagged for 1.4. |
+| 2026-10-05 | 1.4 | Leakage audit: 9 post-contact columns dropped (`Tags` alone adds +0.148 PR-AUC); quick-model base PR-AUC 0.804 vs. 0.385 random; `make leakage`; ADR-001; cleaned data → 9,240 × 14. |
