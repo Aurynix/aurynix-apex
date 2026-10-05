@@ -176,3 +176,46 @@ Test PR-AUC (0.787) is below validation (0.839) and the CV average (0.818). Chec
 | Where the gap is | Mostly Landing Page Submission leads: PR-AUC 0.737 on test vs. 0.811 on validation |
 
 Conclusion: validation was a slightly easy sample and test a slightly hard one. The best estimate for new leads is **PR-AUC ≈ 0.80 ± 0.03**, with the top 20% finding about 43–46% of buyers. The test numbers above are the ones reported.
+
+## Step 3.2: Probability calibration
+
+A score is shown to sales reps as a probability, so **a predicted 0.70 should mean about 70% of such leads convert**. Target ([problem_framing.md](problem_framing.md) 5.2): expected calibration error (ECE) ≤ 0.05.
+
+```bash
+make calibration   # out-of-fold check on train + validation, figure in reports/figures/
+```
+
+**How it is checked without the test split:** every lead in train + validation (7,392) is scored by a model trained on the other 4/5 of the data (5-fold out-of-fold predictions). Leads are grouped by predicted probability (0–0.1, 0.1–0.2, …), and each group's average prediction is compared with its actual conversion rate.
+
+**ECE** = the average gap between predicted and actual, weighted by the number of leads in each group. 0 is perfect.
+
+| Probabilities | ECE | Brier | PR-AUC | Mean prediction (actual 0.385) |
+|---|---|---|---|---|
+| **Raw Logistic Regression** | **0.031** ✅ | **0.1377** | **0.824** | **0.386** |
+| Platt scaling | 0.032 | 0.1378 | 0.824 | 0.385 |
+| Isotonic regression | 0.006 | 0.1362 | 0.821 | 0.385 |
+
+Raw model, per group:
+
+| Predicted | Leads | Mean predicted | Actually converted | Gap |
+|---|---|---|---|---|
+| 0.0–0.1 | 1,235 | 5.5% | 4.0% | −1.5 |
+| 0.1–0.2 | 1,759 | 14.1% | 12.8% | −1.3 |
+| 0.2–0.3 | 879 | 24.4% | 21.8% | −2.6 |
+| 0.3–0.4 | 816 | 32.7% | 37.1% | +4.4 |
+| 0.4–0.5 | 283 | 45.1% | 50.5% | +5.4 |
+| 0.5–0.6 | 375 | 55.5% | 65.9% | **+10.4** |
+| 0.6–0.7 | 349 | 65.3% | 71.9% | +6.6 |
+| 0.7–0.8 | 417 | 75.1% | 75.1% | 0.0 |
+| 0.8–0.9 | 449 | 84.9% | 75.3% | **−9.6** |
+| 0.9–1.0 | 830 | 96.0% | 94.8% | −1.2 |
+
+![Calibration](../reports/figures/calibration.png)
+
+**Decision: keep the raw probabilities** ([ADR-005](decisions.md)).
+- The raw model meets the target: ECE 0.031 ≤ 0.05, and the average prediction (38.6%) equals the actual rate (38.5%). At 0.7–0.8, predicted and actual are both 75%.
+- It is not perfect: leads scored 0.5–0.6 convert about 10 points **more** often than predicted, and leads scored 0.8–0.9 about 10 points **less**. Isotonic calibration removes most of this (ECE 0.006).
+- Isotonic was **not** chosen: it replaces one model with 5 models plus a step function, makes per-lead explanations (step 3.4) indirect, slightly lowers ranking (PR-AUC 0.821 vs. 0.824), and improves Brier by only 0.0015.
+- Platt scaling changes nothing (Logistic Regression is already a sigmoid model).
+
+Revisit if the product shows exact percentages to reps and the 0.5–0.9 range matters; switching is one line (`CalibratedClassifierCV(make_model(), method="isotonic")`).

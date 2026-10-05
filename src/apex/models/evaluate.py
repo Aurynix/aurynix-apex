@@ -1,6 +1,7 @@
 """Metrics for a ranked list of leads (see docs/problem_framing.md section 5).
 
-- PR-AUC (primary), ROC-AUC, Brier score: standard model quality.
+- PR-AUC (primary), ROC-AUC: ranking quality.
+- Brier score, expected calibration error (ECE): are the probabilities honest?
 - Precision and recall at the top k%: the business view. If the sales team
   only calls the top 20% of leads, how many of those calls are buyers
   (precision), and what share of all buyers do they reach (recall)?
@@ -8,6 +9,7 @@
 """
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -26,6 +28,23 @@ def top_share(y_score, share: float) -> np.ndarray:
     return called
 
 
+def calibration_table(y_true, y_score, n_bins: int = 10) -> pd.DataFrame:
+    """Leads, mean predicted probability, and actual conversion rate per 0.1-wide bin."""
+    y_score = np.asarray(y_score)
+    bins = np.minimum((y_score * n_bins).astype(int), n_bins - 1)
+    df = pd.DataFrame({"bin": bins / n_bins, "actual": np.asarray(y_true), "predicted": y_score})
+    return df.groupby("bin").agg(
+        leads=("actual", "size"), predicted=("predicted", "mean"), actual=("actual", "mean")
+    )
+
+
+def expected_calibration_error(y_true, y_score, n_bins: int = 10) -> float:
+    """Average gap between predicted and actual rate, weighted by leads per bin."""
+    table = calibration_table(y_true, y_score, n_bins)
+    weights = table["leads"] / table["leads"].sum()
+    return float((weights * (table["predicted"] - table["actual"]).abs()).sum())
+
+
 def evaluate(y_true, y_score, shares: tuple[float, ...] = (0.2, 0.5)) -> dict[str, float]:
     """All metrics for one set of predictions, as a flat dict (ready for MLflow)."""
     at_half = (np.asarray(y_score) >= 0.5).astype(int)
@@ -33,6 +52,7 @@ def evaluate(y_true, y_score, shares: tuple[float, ...] = (0.2, 0.5)) -> dict[st
         "pr_auc": average_precision_score(y_true, y_score),
         "roc_auc": roc_auc_score(y_true, y_score),
         "brier": brier_score_loss(y_true, y_score),
+        "ece": expected_calibration_error(y_true, y_score),
         "precision_at_0.5": precision_score(y_true, at_half, zero_division=0),
         "recall_at_0.5": recall_score(y_true, at_half),
     }
@@ -101,6 +121,33 @@ def plot_test_report(y_true, y_score, file, title: str) -> None:
         )
     lift_ax.set_ylim(0, 1 / rate + 0.3)
     fig.suptitle(title, x=0.01, ha="left", color=ink)
+    fig.tight_layout()
+    fig.savefig(file, dpi=120)
+    plt.close(fig)
+
+
+def plot_calibration(curves: dict[str, pd.DataFrame], file, title: str) -> None:
+    """Reliability diagram: predicted probability vs. actual conversion rate per bin."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    colors = ["#2a78d6", "#eb6834", "#1baf7a"]  # categorical slots 1-3
+    ink, muted, grid, surface = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
+    fig, ax = plt.subplots(figsize=(6.5, 6), facecolor=surface)
+    ax.plot([0, 1], [0, 1], color=muted, linestyle="--", linewidth=1, label="Perfect")
+    for (name, table), color in zip(curves.items(), colors, strict=False):
+        ax.plot(table["predicted"], table["actual"], "o-", color=color, linewidth=2, label=name)
+    ax.set_xlabel("Predicted probability", fontsize=9, color=muted)
+    ax.set_ylabel("Actual conversion rate", fontsize=9, color=muted)
+    ax.set_title(title, loc="left", fontsize=10, color=ink, fontweight="bold")
+    ax.set_facecolor(surface)
+    ax.grid(color=grid, linewidth=0.6)
+    ax.tick_params(colors=muted, labelsize=8, length=0)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.legend(frameon=False, fontsize=8, labelcolor=ink)
     fig.tight_layout()
     fig.savefig(file, dpi=120)
     plt.close(fig)

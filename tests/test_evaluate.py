@@ -38,3 +38,22 @@ def test_plot_test_report_writes_a_figure(tmp_path):
     file = tmp_path / "report.png"
     plot_test_report(Y, SCORE, file, "test")
     assert file.stat().st_size > 0
+
+
+def test_calibration_table_and_ece_for_honest_scores():
+    from apex.models.evaluate import calibration_table, expected_calibration_error
+
+    # bin 0.2: predicted 0.25, 1 of 4 convert; bin 0.7: predicted 0.75, 3 of 4 convert
+    y = [1, 0, 0, 0, 1, 1, 1, 0]
+    score = [0.25] * 4 + [0.75] * 4
+    table = calibration_table(y, score)
+    assert table["actual"].tolist() == [0.25, 0.75]
+    assert table["leads"].tolist() == [4, 4]
+    assert expected_calibration_error(y, score) == pytest.approx(0.0)
+
+
+def test_ece_measures_overconfidence():
+    from apex.models.evaluate import expected_calibration_error
+
+    # predicts 0.9 for everyone, half convert → gap 0.4
+    assert expected_calibration_error([1, 0] * 5, [0.9] * 10) == pytest.approx(0.4)

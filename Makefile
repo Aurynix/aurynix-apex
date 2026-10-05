@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate train cv tune predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration train cv tune predict pipeline run run-prod demo \
         monitor mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -47,6 +47,9 @@ baselines: ## Fit no-skill + Logistic Regression baselines, log to MLflow
 
 evaluate: ## Step 3.1: retrain on train + val, score the test set ONCE, save figure
 	$(RUN) python -m apex.models.train test
+
+calibration: ## Step 3.2: out-of-fold calibration check (raw / Platt / isotonic), save figure
+	$(RUN) python -m apex.models.train calibration
 
 train: ## Train model, save artifacts and reference profile
 	$(todo)

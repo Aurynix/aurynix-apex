@@ -183,6 +183,7 @@ Final model: **Logistic Regression** on 24 features built from 7 raw lead fields
 | PR-AUC | 0.385 | **0.787** (95% CI 0.756–0.816) | far above no skill ✅ |
 | ROC-AUC | 0.500 | **0.855** | < 0.95 (no leakage alarm) ✅ |
 | Brier score | 0.237 | **0.149** | below no skill ✅ |
+| Calibration error (ECE, out-of-fold) | — | **0.031** | ≤ 0.05 ✅ |
 | Buyers found in the top 20% (recall) | 20% | **43.3%** (lift 2.16) | ≥ 40% ✅ |
 | Calls that reach a buyer in the top 20% (precision) | 38.5% | **83.2%** | — |
 | Buyers found in the top 50% (recall) | 50% | **85.4%** | ≥ 80% ✅ |
@@ -448,6 +449,7 @@ Run `make help` for the full list.
 | | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
 | | `make tune` | Grid search over `C` and class weights, logged to MLflow |
 | | `make evaluate` | Retrain on train + val, score the test set once, save figure |
+| | `make calibration` | Check probability calibration (raw / Platt / isotonic), save figure |
 | | `make predict` | Offline batch scoring |
 | | `make pipeline` | Clean + train |
 | Serving | `make run` / `make run-prod` | Start API (dev / prod) |
@@ -482,7 +484,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 
 ### Week 3: Evaluate & Explain
 - [x] Final test-set evaluation
-- [ ] Probability calibration
+- [x] Probability calibration
 - [ ] High / Medium / Low segmentation
 - [ ] SHAP explainability
 
