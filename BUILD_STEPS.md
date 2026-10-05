@@ -94,7 +94,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Correlations and redundant features.
 - [ ] Save key figures to `reports/figures/`.
 - [ ] Write findings and the resulting feature ideas.
-- **Files:** `docs/eda.md`, `src/apex/data/eda.py`, `tests/test_eda.py`, `reports/figures/eda_*.png`
+- **Files:** `notebooks/01_eda.ipynb`, `reports/figures/`
 - **Done when:** there is a clear list of findings that drive feature engineering.
 
 ---
