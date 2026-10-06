@@ -30,7 +30,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 
 from apex.config import load_config, path
 from apex.data.features import build_pipeline
-from apex.data.load import file_sha256, load_raw, raw_leads_path
+from apex.data.load import file_sha256, load_raw, raw_data_path
 from apex.data.split import load_splits
 from apex.models.evaluate import calibration_table, evaluate, plot_calibration, plot_test_report
 
@@ -215,8 +215,8 @@ def run_final() -> dict[str, Any]:
         "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "sklearn_version": sklearn.__version__,
         "data": {
-            "file": raw_leads_path().name,
-            "sha256": file_sha256(raw_leads_path()),
+            "file": raw_data_path().name,
+            "sha256": file_sha256(raw_data_path()),
             "rows": len(raw),
             "raw_columns": raw.shape[1],
             "conversion_rate": round(float(y.mean()), 4),

@@ -228,12 +228,36 @@ The step's checkbox and **Log** entry are updated in the same branch.
 ## Phase 5 — Later
 
 - [x] `outcomes` table and live performance tracking: `prediction_id` in every prediction, `POST /outcomes`, performance check (real PR-AUC and High precision vs. test, `retrain_recommended`), `make outcomes-demo` (ADR-008).
-- [ ] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage.
+- [ ] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage: in progress as Phase 6.
 - [ ] Integration with Aurynix Pulse.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
 - [x] Remove unused dependencies (`xgboost`, `lightgbm`, `optuna`, `evidently`, `seaborn`, `pyarrow`, `python-multipart`; `shap` moved to dev): smaller installs and Docker image.
 
 ---
+
+## Phase 6 — Second dataset: Bank Marketing
+
+Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, and check that the leakage audit catches `duration`. Scope: pipeline and report, no second API. Report: [`docs/bank_marketing.md`](docs/bank_marketing.md). Every command runs with `APEX_CONFIG=config_bank.json`.
+
+### B.1 Data collection & quality ✅
+- [x] `config_bank.json` with its own paths (`models/bank/`, `reports/figures/bank/`, `data/splits_bank.csv`), so the lead model is never overwritten.
+- [x] Downloader: zip from a URL, including zips inside zips; loader: `;` separator, `yes`/`no` target → 1/0, `row_id` when the file has no id.
+- [x] Same `clean()` through config only (`"unknown"` → missing, yes/no → 1/0 in any letter case, caps); data quality documented.
+- **Files:** `config_bank.json`, `src/apex/data/download.py`, `src/apex/data/load.py`, `src/apex/data/clean.py`, tests, `docs/bank_marketing.md`
+- **Done when:** `APEX_CONFIG=config_bank.json make data-download data-info` works and `clean(load_raw())` gives clean data with no new cleaning code.
+
+### B.2 Leakage audit
+- [ ] Classify every column against the prediction moment (before the call); run the with/without check; `duration` must stand out.
+
+### B.3 Features
+- [ ] Make the lead-specific feature code config-driven; add bank features (e.g. "contacted before" from `pdays`).
+
+### B.4 Model, evaluation, segments
+- [ ] Split, baseline, CV, tuning (class weights at 11.7%), test evaluation, calibration, segments.
+
+### B.5 Report
+- [ ] Complete `docs/bank_marketing.md`; README section comparing both datasets.
+
 
 ## Log
 
@@ -268,3 +292,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 5 | CI/CD: GitHub Actions runs lint + 96 tests on every push / PR (no data or secrets needed), builds the Docker image on PRs, and pushes it to `ghcr.io/aurynix/aurynix-apex` on `main`. |
 | 2026-10-06 | 5 | Removed unused dependencies (xgboost, lightgbm, optuna, evidently, seaborn, pyarrow, python-multipart; shap → dev): Docker image 3.51 GB → 1.49 GB, local env 1.2 GB; every make target and the Docker stack re-checked. |
 | 2026-10-06 | 5 | Outcomes: `prediction_id` + `POST /outcomes` + performance check. Simulation: behavior change with unchanged inputs → drift checks green, real PR-AUC 0.787 → 0.571, High precision 83% → 64% → retraining recommended. 101 tests. |
+| 2026-10-07 | B.1 | Bank Marketing data: UCI download (nested zip), `config_bank.json` with separate paths, loader handles `;`, yes/no target, missing id; same `clean()` through config only → 45,211 × 17, 0 nulls, 11.7% positive. |

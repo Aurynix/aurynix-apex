@@ -30,9 +30,9 @@ make data-download   # fetch from Kaggle into data/raw/
 make data-info       # print shape, SHA-256, conversion rate, and column list
 ```
 
-### 1.2 Secondary (planned): Bank Marketing (UCI, id 222)
+### 1.2 Secondary: Bank Marketing (UCI, id 222)
 
-Not yet downloaded. It will be recorded here when the pipeline is applied to it (Phase 5).
+Downloaded and documented in [bank_marketing.md](bank_marketing.md) (Phase 6): 45,211 × 17, 11.7% positive, SHA-256 `d1513ec6…849ed32d`.
 
 ---
 

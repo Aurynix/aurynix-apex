@@ -113,9 +113,10 @@ For every lead it returns:
 - The placeholder value `"Select"` means the user did not choose an option. It is treated as missing.
 - Several columns may be filled in by sales **after** contact (see [Data Leakage Policy](#data-leakage-policy)).
 
-### Secondary (planned): Bank Marketing Dataset (UCI, id 222)
+### Secondary (in progress): Bank Marketing Dataset (UCI, id 222)
 - Used to prove the pipeline is reusable on a second, highly imbalanced dataset.
 - Contains a well-known leakage feature (`duration`, the call length, only known after the call).
+- 45,211 clients, 11.7% subscribed. Progress and findings: [docs/bank_marketing.md](docs/bank_marketing.md).
 
 > Raw data is never committed to this repository.
 

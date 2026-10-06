@@ -13,7 +13,7 @@
     "mlflow_tracking_uri": "sqlite:///mlflow.db"
   },
   "files": {
-    "raw_leads": "Leads.csv",
+    "raw_data": "Leads.csv",
     "raw_data_dictionary": "Leads Data Dictionary.xlsx",
     "model": "model.pkl",
     "model_meta": "model_meta.json",
@@ -23,8 +23,8 @@
   },
   "source": {
     "kaggle_dataset": "amritachatterjee09/lead-scoring-dataset",
-    "kaggle_files": {
-      "Lead Scoring.csv": "raw_leads",
+    "files": {
+      "Lead Scoring.csv": "raw_data",
       "Leads Data Dictionary.xlsx": "raw_data_dictionary"
     }
   },
