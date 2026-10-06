@@ -23,7 +23,7 @@ from sklearn.model_selection import StratifiedKFold
 from apex.config import load_config
 from apex.data.split import load_splits
 from apex.models.evaluate import evaluate
-from apex.models.train import EXPERIMENT, make_model
+from apex.models.train import experiment, make_model
 
 N_FOLDS = 5
 GRID = {"C": [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0], "class_weight": [None, "balanced"]}
@@ -88,14 +88,14 @@ def run(command: str = "features") -> pd.DataFrame:
     """Run one CV command on the train split and print its table."""
     cfg = load_config()
     mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
-    mlflow.set_experiment(EXPERIMENT)
+    mlflow.set_experiment(experiment())
 
     train = load_splits()["train"]
     target = cfg["data"]["target"]
     X, y = train.drop(columns=[target]), train[target]
 
     table = {"features": compare_features, "tune": tune}[command](X, y, cfg)
-    print(f"{N_FOLDS}-fold CV on the train split ({len(X):,} leads)\n")
+    print(f"{N_FOLDS}-fold CV on the train split ({len(X):,} rows)\n")
     print(table.round(4).to_string())
     return table
 

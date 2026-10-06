@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain train cv tune predict pipeline run run-prod demo \
+.PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain time-split train cv tune predict pipeline run run-prod demo \
         monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
@@ -55,6 +55,9 @@ segments: ## Step 3.3: derive High / Medium / Low thresholds and print segment t
 
 explain: ## Step 3.4: global feature importance, figure, and example per-lead reasons
 	$(RUN) python -m apex.models.explain
+
+time-split: ## Train on older rows, test on newer (date-ordered data only, e.g. Bank Marketing)
+	$(RUN) python -m apex.models.train time-split
 
 train: ## Fit the final model on all leads; save model, meta, reference profile, model card
 	$(RUN) python -m apex.models.train final

@@ -15,7 +15,7 @@ The bank config has its own paths (`models/bank/`, `reports/figures/bank/`, `dat
 | B.1 Data collection & quality | ✅ this page, sections 1–2 |
 | B.2 Leakage audit (`duration`) | ✅ section 4 |
 | B.3 Features | ✅ section 5 |
-| B.4 Model, evaluation, segments | ⏳ |
+| B.4 Model, evaluation, segments | ✅ section 6 |
 | B.5 Report and comparison with the lead model | ⏳ |
 
 ---
@@ -168,4 +168,85 @@ Example reasons (`explain_one`), as a bank agent would see them:
 
 ## 6. Model and results (B.4)
 
-⏳
+The **same commands** as for the leads, with the bank config. The bank has its own MLflow experiment (`apex-bank-marketing`) and saves its model to `models/bank/`.
+
+```bash
+export APEX_CONFIG=config_bank.json
+make split baselines tune   # 60 / 20 / 20 split (11.7% in each), baselines, grid search
+make evaluate               # test set, used once
+make calibration segments time-split train
+```
+
+### Baselines and tuning
+
+Validation split (9,042 clients):
+
+| Model | PR-AUC | ROC-AUC | Top 20%: precision / recall |
+|---|---|---|---|
+| Random calling (no skill) | 0.117 | 0.500 | 11.7% / 20% |
+| Logistic Regression | **0.376** | 0.731 | **29.8% / 51.0%** (lift 2.55) |
+
+Grid search (`make tune`, 5-fold CV on train): the same result as for the leads ([ADR-004](decisions.md)).
+- `C` from 0.03 to 10: PR-AUC 0.356–0.357, all within the noise (± 0.015). `C = 1` stays.
+- `balanced` class weights: same ranking (0.355), but the **Brier score doubles** (0.090 → 0.199). With 11.7% positives, balancing pushes every probability far too high. No class weights.
+
+### Test set (used once)
+
+Fitted on train + validation (36,168), scored on the test split (9,043):
+
+| Metric | Random calling | **Test** |
+|---|---|---|
+| PR-AUC | 0.117 | **0.359** (CV 0.356, validation 0.376) |
+| ROC-AUC | 0.500 | 0.726 |
+| Brier | 0.103 | 0.089 |
+| Calibration error (ECE) | — | **0.009** |
+| Top 20%: precision / recall | 11.7% / 20% | **28.9% / 49.4%** (lift 2.47) |
+| Top 50%: precision / recall | 11.7% / 50% | 17.6% / 75.1% |
+
+![Bank test evaluation](../reports/figures/bank/test_evaluation.png)
+
+### Calibration
+
+Out-of-fold on train + validation (36,168 clients):
+
+| Probabilities | ECE | Brier | PR-AUC |
+|---|---|---|---|
+| **Raw (kept)** | **0.005** | 0.0895 | 0.360 |
+| Platt | 0.005 | 0.0895 | 0.360 |
+| Isotonic | 0.009 | 0.0910 | 0.353 |
+
+The raw probabilities are already very well calibrated (a predicted 13% → 13.3% actual; 45% → 45%), better than isotonic, so no extra step ([ADR-005](decisions.md) holds here too). The only weak spot is the rare top group: predicted 0.85 → 72% actual (194 clients).
+
+![Bank calibration](../reports/figures/bank/calibration.png)
+
+### Segments (capacity: top 20% / next 30% / rest)
+
+Thresholds from out-of-fold scores: High ≥ **0.137**, Medium ≥ **0.085** (much lower than for leads, because only 11.7% subscribe).
+
+| Segment (test, 9,043) | Clients | Subscribe | Share of all subscriptions |
+|---|---|---|---|
+| 🟢 High | 1,833 (20%) | **28.6%** | **49.6%** |
+| 🟡 Medium | 2,782 (31%) | 9.9% | 26.1% |
+| 🔴 Low | 4,428 (49%) | 5.8% | 24.3% |
+
+High subscribes **4.9×** more often than Low. Calling the top half reaches 76% of subscribers.
+
+### Time split: does the model age well?
+
+The file is in date order, so `make time-split` trains on the **oldest 80%** of clients and tests on the **newest 20%**:
+
+| | Random split | **Time split** |
+|---|---|---|
+| Conversion in training / test | 11.7% / 11.7% | **6.7% / 31.6%** |
+| PR-AUC (vs. random calling) | 0.359 vs. 0.117 → **3.1×** | 0.522 vs. 0.316 → **1.7×** |
+| ROC-AUC | 0.726 | 0.707 |
+| Top 20%: precision / recall | 28.9% / 49.4% | 56.4% / 35.7% |
+| Calibration error (ECE) | 0.009 | **0.163** |
+
+- **The ranking carries over to a new period:** ROC-AUC drops only slightly (0.726 → 0.707), so the model still puts better clients first, and the High / Medium / Low segments (which use rank) still work.
+- **The probabilities do not:** the model learned that ~7% subscribe; in the newest period 32% did. Every probability is far too low.
+- In production, this is what the **outcomes check** catches (real results vs. expected) and the reason to retrain regularly. The random-split numbers above are therefore optimistic for a model used months after training.
+
+### Final model
+
+`make train` fits the final model on all 45,211 clients → `models/bank/model.pkl`, `model_meta.json`, `reference_profile.json` (out-of-fold PR-AUC 0.360). No model card: `card.py` describes the lead product (`config_bank.json → project.model_card = false`).
