@@ -3,6 +3,7 @@
 > Surface the apex of your pipeline: predict which leads will convert, so sales teams call the right people first.
 
 ![Status](https://img.shields.io/badge/status-v0.1.0%20complete-brightgreen)
+[![CI/CD](https://github.com/Aurynix/aurynix-apex/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Aurynix/aurynix-apex/actions/workflows/ci-cd.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -484,6 +485,8 @@ make demo          # demo → http://localhost:8501   (second terminal)
 make docker-build
 make docker-up     # same URLs; `make docker-down` to stop
 ```
+
+Every push and pull request runs lint, all tests, and a Docker build in GitHub Actions; merges to `main` publish the image to `ghcr.io/aurynix/aurynix-apex` ([CI/CD](docs/deployment.md#cicd)).
 
 Port 8000 or 8501 already taken? `make run API_PORT=8020`, `make demo API_PORT=8020 DEMO_PORT=8521`, or set `API_PORT` / `DEMO_PORT` in `.env` for Docker. Details: [docs/deployment.md](docs/deployment.md).
 
