@@ -153,6 +153,31 @@ def tab_monitoring() -> None:
         return
     st.metric("Status", STATUS_ICON.get(report["status"], report["status"]))
     st.caption(f"{report['n_samples']:,} predictions · run at {report['created_at']}")
+    if report.get("retrain_recommended"):
+        st.error("Retraining recommended.")
+
+    perf = report.get("performance", {})
+    st.subheader("Performance on real outcomes")
+    if perf.get("status", "insufficient_data") == "insufficient_data":
+        st.info(
+            f"Not enough outcomes yet ({perf.get('n_outcomes', 0):,}). "
+            "Send real results to `POST /outcomes` with each lead's `prediction_id`."
+        )
+    else:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Status", STATUS_ICON.get(perf["status"], perf["status"]))
+        act, exp = perf["actual"], perf["expected"]
+        c2.metric(
+            "PR-AUC", f"{act['pr_auc']:.3f}", f"{act['pr_auc'] - exp['pr_auc']:+.3f} vs. test"
+        )
+        if act["precision_high"] is not None:
+            c3.metric(
+                "High segment precision",
+                f"{act['precision_high']:.0%}",
+                f"{act['precision_high'] - exp['precision_high']:+.0%} vs. test",
+            )
+        st.caption(f"{perf['n_outcomes']:,} outcomes in the last {perf['window_days']} days")
+
     if "features" not in report:
         st.warning(f"Not enough predictions for a reliable check (status: {report['status']}).")
         return

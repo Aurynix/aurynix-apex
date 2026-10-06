@@ -50,7 +50,8 @@ Routers do not know how the model works.
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
 | `POST` | `/predict/batch` | Score up to 10,000 leads (results keep input order) |
-| `POST` | `/monitoring/run` | Run drift monitoring now ([monitoring.md](monitoring.md)) |
+| `POST` | `/outcomes` | Send real results (converted or not) by `prediction_id` |
+| `POST` | `/monitoring/run` | Run monitoring now: drift, data quality, performance ([monitoring.md](monitoring.md)) |
 | `GET` | `/monitoring/latest` | Latest drift report |
 | `GET` | `/monitoring/history` | Status and key numbers of past runs |
 
@@ -85,6 +86,7 @@ curl -X POST localhost:8000/predict/single -H 'content-type: application/json' -
 
 ```json
 {
+  "prediction_id": 1042,
   "score": 0.9568,
   "segment": "high",
   "reasons": {
@@ -109,6 +111,7 @@ curl -X POST localhost:8000/predict/batch -H 'content-type: application/json' \
   "count": 1,
   "predictions": [
     {
+      "prediction_id": 1043,
       "score": 0.0134,
       "segment": "low",
       "reasons": {
@@ -139,3 +142,20 @@ Every scored lead is saved in `data/apex.db` (`config.json → paths.database`),
 | `segment` | `high` |
 
 Drift monitoring reads this table ([monitoring.md](monitoring.md)).
+
+## Outcomes
+
+Every prediction returns a `prediction_id`. When the real result is known, send it back:
+
+```bash
+curl -X POST localhost:8000/outcomes -H 'content-type: application/json' \
+  -d '{"outcomes": [{"prediction_id": 1042, "converted": true}, {"prediction_id": 1043, "converted": false}]}'
+```
+
+```json
+{"saved": 2}
+```
+
+- Up to 10,000 outcomes per request. Sending an outcome again for the same prediction replaces it.
+- If any `prediction_id` is unknown, **nothing** is saved and the API answers `404` with `{"detail": {"message": "Unknown prediction_id", "unknown": [...]}}`.
+- Saved in table `outcomes` (`prediction_id`, `converted`, `recorded_at`) and used by the performance check in monitoring.

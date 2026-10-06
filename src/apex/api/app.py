@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 
 from apex.api.database import log_rejection
 from apex.api.dependencies import Service, create_service, monitor_for
-from apex.api.routers import model, monitoring, predict
+from apex.api.routers import model, monitoring, outcomes, predict
 from apex.api.schemas import Health
 from apex.api.service import ScoringService
 from apex.monitoring.monitor import Monitor
@@ -52,6 +52,7 @@ def create_app(service: ScoringService | None = None, monitor: Monitor | None = 
 
     app.include_router(model.router)
     app.include_router(predict.router)
+    app.include_router(outcomes.router)
     app.include_router(monitoring.router)
     return app
 

@@ -36,4 +36,4 @@ MonitorDep = Annotated[Monitor, Depends(get_monitor)]
 
 
 def monitor_for(service: ScoringService) -> Monitor:
-    return create_monitor(db=service.db, model=service.model)
+    return create_monitor(db=service.db, model=service.model, meta=service.meta)

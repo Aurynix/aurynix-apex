@@ -97,7 +97,7 @@ The main question: **what share of all conversions lands in the High segment?**
 **Out of scope (for now)**
 - Revenue or deal-size prediction (only *whether* the lead converts).
 - Time-to-conversion and next-best-action recommendations.
-- Live feedback from real outcomes (planned: `outcomes` table).
+- Live feedback from real outcomes: built as `POST /outcomes` + the performance check ([monitoring.md](monitoring.md)).
 - Fairness auditing beyond checking that no protected attributes are used as features.
 
 ## 8. Assumptions
@@ -116,7 +116,7 @@ The main question: **what share of all conversions lands in the High segment?**
 | **Snapshot data without timestamps** | Cannot prove when activity happened | Conservative feature choice; documented limitation |
 | **Dataset not representative** (one company, one period) | Results may not carry over to Aurynix Pulse clients | Re-validate on Bank Marketing data; drift monitoring |
 | **Class imbalance** (moderate here, severe in Bank Marketing) | Accuracy looks good while ranking is poor | PR-AUC as the primary metric; class weights tested in tuning (step 2.5) |
-| **Feedback loop** (only High leads get called, so mostly they convert) | Future labels become biased toward the model's own choices | Future: keep a small random-contact sample when the `outcomes` table is built |
+| **Feedback loop** (only High leads get called, so mostly they convert) | Future labels become biased toward the model's own choices | Outcomes are tracked; keeping a small random-contact sample of Medium / Low leads is recommended ([ADR-008](decisions.md)) |
 
 ## 10. Open questions
 

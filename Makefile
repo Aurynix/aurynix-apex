@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain train cv tune predict pipeline run run-prod demo \
-        monitor drift-demo mlflow-ui docker-build docker-up docker-down lint format test clean
+        monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
 RUN := uv run
@@ -87,6 +87,9 @@ monitor: ## Drift monitoring on the last 7 days of API predictions (data/apex.db
 
 drift-demo: ## Simulate stable vs. drifted traffic and show that the monitor flags only the drift
 	$(RUN) python -m apex.monitoring.simulate
+
+outcomes-demo: ## Send real outcomes, then changed behavior; show the performance check
+	$(RUN) python -m apex.monitoring.simulate outcomes
 
 mlflow-ui: ## Open MLflow at http://localhost:5000
 	$(RUN) mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000

@@ -13,7 +13,7 @@ Drift means **the data changed**, not that the model is wrong. It is the signal 
 
 ---
 
-## The three checks
+## The four checks
 
 ### 1. Feature drift: did the inputs change?
 
@@ -38,6 +38,21 @@ For each model input (time on website, visits, time per visit, occupation, lead 
 
 Invalid requests are logged by the API in `rejected_requests`, so this check sees problems the model never sees.
 
+### 4. Performance: is the model still right?
+
+Drift only shows that the data changed. When the real result of a lead is known (converted or not), send it to `POST /outcomes` with the lead's `prediction_id` (returned by every prediction). The monitor then compares real results with the test results saved with the model (`model_meta.json`):
+
+| Measure | Expected (test) | Warning | Drift → retraining recommended |
+|---|---|---|---|
+| PR-AUC on leads with outcomes | 0.787 | drop ≥ 0.05 | drop ≥ 0.10 |
+| Precision of the High segment (share that converted) | 83% | drop ≥ 5 points | drop ≥ 10 points |
+
+- Uses outcomes **recorded in the last 30 days** (conversions arrive later than predictions); needs **200** outcomes with both results present.
+- Sending an outcome again for the same prediction replaces it. Unknown ids are rejected (404) and nothing is saved.
+- `retrain_recommended` is `true` when performance or the score distribution is in drift.
+
+**Limit (feedback loop):** outcomes mostly arrive for leads that were called, and most called leads are High. Measured performance therefore leans toward the model's own choices. Keeping a small random sample of Medium / Low leads that are also called would make it unbiased ([ADR-008](decisions.md)).
+
 ## PSI
 
 **Population Stability Index**: how different two distributions are over the same bins.
@@ -54,7 +69,7 @@ PSI = Σ (now_share − training_share) × ln(now_share / training_share)
 
 Empty bins get a tiny share (0.0001) so the formula never divides by zero.
 
-**Overall status** = the worst of all checks. With fewer than **200** predictions in the window, the run is `insufficient_data`.
+**Overall status** = the worst of all checks. Drift and data quality need **200** predictions in the window, performance needs **200** outcomes; with neither, the run is `insufficient_data`.
 
 ## Simulation: does it catch real drift?
 
@@ -74,6 +89,20 @@ Empty bins get a tiny share (0.0001) so the formula never divides by zero.
 
 Stable data is not flagged; the shift is flagged on exactly the inputs that changed, and the segment shares show the business impact (High leads drop from 20% to 7%).
 
+## Simulation: does it catch a model that went wrong?
+
+`make outcomes-demo` samples 2,000 real leads **with their real outcome**, scores them, and sends the outcomes back. Then it repeats with **changed customer behavior**: half of the outcomes are shuffled, so the score no longer matches who buys, while the inputs stay exactly the same.
+
+| | Real outcomes | Behavior changed |
+|---|---|---|
+| Feature / prediction drift, data quality | 🟢 ok | 🟢 ok (inputs did not change) |
+| PR-AUC (expected 0.787) | 0.828 | **0.571** |
+| High precision (expected 83%) | 86% | **64%** |
+| Performance | 🟢 ok | 🔴 drift |
+| `retrain_recommended` | false | **true** |
+
+Only the outcomes catch this case. (The first scenario is in-sample, since the final model was trained on all of `Leads.csv`, so 0.828 is slightly optimistic; the demo shows the mechanics.)
+
 ## Where results go
 
 | Place | Content |
@@ -86,6 +115,7 @@ API:
 
 | Method | Path | Description |
 |---|---|---|
+| `POST` | `/outcomes` | Send real results: `{"outcomes": [{"prediction_id": 1042, "converted": true}]}` |
 | `POST` | `/monitoring/run?window_days=7` | Run the checks now and return the report |
 | `GET` | `/monitoring/latest` | The latest report (404 if none yet) |
 | `GET` | `/monitoring/history?limit=30` | Status, sample size, score PSI, segment shares per run |
@@ -121,4 +151,4 @@ API:
 ## Not done (on purpose)
 
 - **Evidently HTML reports**: the own PSI code, the JSON report, and the API cover the need with no extra dependency.
-- **Real performance**: drift shows the data changed, not that predictions are wrong. When conversion outcomes arrive from Aurynix Pulse, an `outcomes` table can measure live precision of the High segment.
+- **Random-contact sample** against the feedback loop: documented, not built (needs a sales process change, not code).

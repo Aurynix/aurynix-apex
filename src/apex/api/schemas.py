@@ -66,6 +66,7 @@ class Reasons(BaseModel):
 
 
 class Prediction(BaseModel):
+    prediction_id: int = Field(description="Send this id with the real result to POST /outcomes")
     score: float = Field(ge=0, le=1, description="Probability that the lead converts")
     segment: Literal["high", "medium", "low"]
     reasons: Reasons
@@ -75,6 +76,19 @@ class Prediction(BaseModel):
 class BatchPrediction(BaseModel):
     count: int
     predictions: list[Prediction]
+
+
+class Outcome(BaseModel):
+    prediction_id: int = Field(ge=1)
+    converted: bool = Field(description="Did the lead become a customer?")
+
+
+class OutcomeBatch(BaseModel):
+    outcomes: list[Outcome] = Field(min_length=1, max_length=10_000)
+
+
+class OutcomesSaved(BaseModel):
+    saved: int
 
 
 class ModelInfo(BaseModel):

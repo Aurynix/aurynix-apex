@@ -59,7 +59,7 @@ def trained():
         "data": {"rows": len(leads)},
         "input_fields": cfg["serving"]["input_fields"],
         "segments": {"thresholds": thresholds},
-        "performance": {"test": {"pr_auc": 0.9}},
+        "performance": {"test": {"pr_auc": 0.9, "precision_top20": 0.9}},
         "explainer_means": dict(enumerate(Explainer.fit(model, leads).means)),
     }
     profile = build_profile(leads, model[0][:-1].transform(leads), scores, segments, cfg)
@@ -81,11 +81,12 @@ def service(trained, db):
 
 @pytest.fixture
 def monitor(trained, db, tmp_path, monkeypatch):
-    """Monitor with min_samples = 50; reports are written to a temp folder."""
+    """Monitor with min_samples = min_outcomes = 50; reports go to a temp folder."""
     from apex.monitoring import monitor as monitor_module
 
-    model, _, profile = trained
+    model, meta, profile = trained
     cfg = copy.deepcopy(load_config())
     cfg["monitoring"]["min_samples"] = 50
+    cfg["monitoring"]["min_outcomes"] = 50
     monkeypatch.setattr(monitor_module, "path", lambda key: tmp_path)
-    return Monitor(model, profile, db, cfg)
+    return Monitor(model, profile, db, cfg, meta["performance"]["test"])
