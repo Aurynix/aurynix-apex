@@ -121,6 +121,7 @@ def run_test() -> dict[str, float]:
     metrics = evaluate(test[target], scores)
 
     figure = path("figures_dir") / "test_evaluation.png"
+    figure.parent.mkdir(parents=True, exist_ok=True)
     plot_test_report(test[target], scores, figure, f"Test set ({len(test):,} leads, used once)")
 
     with mlflow.start_run(run_name="final_test"):
@@ -167,6 +168,7 @@ def run_calibration() -> pd.DataFrame:
             mlflow.log_metrics({f"oof_{k}": v for k, v in metrics.items()})
 
     figure = path("figures_dir") / "calibration.png"
+    figure.parent.mkdir(parents=True, exist_ok=True)
     plot_calibration(curves, figure, f"Calibration, out-of-fold ({len(X):,} leads)")
 
     print(f"Out-of-fold predictions on train + validation ({len(X):,} leads)")

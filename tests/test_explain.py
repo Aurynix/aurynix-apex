@@ -63,3 +63,14 @@ def test_explain_one_returns_sorted_reasons(fitted):
     assert all(v > 0 for v in ups) and ups == sorted(ups, reverse=True)
     assert all(v < 0 for v in downs) and downs == sorted(downs)
     assert {"feature", "value", "impact"} <= set((result["reasons_up"] + result["reasons_down"])[0])
+
+
+def test_groups_and_labels_come_from_config(fitted, monkeypatch):
+    from apex.models import explain
+
+    _, leads, explainer = fitted
+    monkeypatch.setattr(explain, "groups", lambda: {"Profile": ["Lead Origin", "Do Not Email"]})
+    monkeypatch.setattr(explain, "labels", lambda: {"Lead Origin": "Origin"})
+    fields = set(explainer.contributions(leads.iloc[:5]).columns)
+    assert "Profile" in fields
+    assert not {"Lead Origin", "Do Not Email"} & fields

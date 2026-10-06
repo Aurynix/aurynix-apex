@@ -1,6 +1,6 @@
 """Feature engineering and the preprocessing pipeline (step 2.1).
 
-`build_pipeline()` returns one sklearn Pipeline that goes from raw lead rows
+`build_pipeline()` returns one sklearn Pipeline that goes from raw rows
 to model-ready numbers:
 
     clean  →  add_features  →  scale numbers + one-hot encode text
@@ -28,21 +28,34 @@ from apex.data.load import load_raw
 
 
 def add_features(df: pd.DataFrame, config: dict[str, Any] | None = None) -> pd.DataFrame:
-    """Add engineered features, drop unused columns, and reduce some columns to
-    "Given" / "Missing" (stateless)."""
+    """Add engineered features and select columns (stateless), all from `config → features`:
+
+    - `presence_only`: {column} → "Given" / "Missing"
+    - `ratios`: {new: [a, b]} → a / b, 0 when b is 0 (e.g. time per visit)
+    - `flags`: {new: [column, value]} → 1 if column > value, else 0 (e.g. contacted before)
+    - `bins`: {column: [edges]} → new text column `<column>_group` (e.g. age bands)
+    - `drop`: columns not used by the model
+    """
     cfg = (config or load_config())["features"]
     df = df.copy()
-    for col in cfg["presence_only"]:
+    for col in cfg.get("presence_only", []):
         if col in df.columns:
             df[col] = df[col].where(df[col] == "Missing", "Given")
-    visits = df["TotalVisits"]
-    df["time_per_visit"] = (df["Total Time Spent on Website"] / visits.where(visits > 0)).fillna(0)
-    df["has_web_activity"] = (visits > 0).astype(int)
-    return df.drop(columns=[c for c in cfg["drop"] if c in df.columns])
+    for name, (num, den) in cfg.get("ratios", {}).items():
+        df[name] = (df[num] / df[den].where(df[den] > 0)).fillna(0)
+    for name, (col, value) in cfg.get("flags", {}).items():
+        df[name] = (df[col] > value).astype(int)
+    for col, edges in cfg.get("bins", {}).items():
+        names = [f"≤ {edges[0]:g}"] + [
+            f"{a:g}–{b:g}" for a, b in zip(edges, edges[1:], strict=False)
+        ]
+        names.append(f"> {edges[-1]:g}")
+        df[f"{col}_group"] = pd.cut(df[col], [-np.inf, *edges, np.inf], labels=names).astype(str)
+    return df.drop(columns=[c for c in cfg.get("drop", []) if c in df.columns])
 
 
 def build_pipeline(config: dict[str, Any] | None = None) -> Pipeline:
-    """Raw lead rows (without the target) → model-ready feature matrix."""
+    """Raw rows (without the target) → model-ready feature matrix."""
     cfg = config or load_config()
     encode = make_column_transformer(
         (StandardScaler(), make_column_selector(dtype_include=np.number)),
@@ -69,7 +82,7 @@ def run() -> pd.DataFrame:
     X = load_raw().drop(columns=[cfg["data"]["target"]])
     pipeline = build_pipeline(cfg)
     features = pd.DataFrame(pipeline.fit_transform(X), columns=pipeline[-1].get_feature_names_out())
-    print(f"{len(X):,} leads: {X.shape[1]} raw columns → {features.shape[1]} features\n")
+    print(f"{len(X):,} rows: {X.shape[1]} raw columns → {features.shape[1]} features\n")
     print("\n".join(features.columns))
     return features
 

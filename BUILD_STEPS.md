@@ -253,8 +253,11 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 - [x] Finding for B.4: the file is ordered by date and conversion rises from 3% to 47%; report random and time splits.
 - **Files:** `config.json`, `config_bank.json`, `src/apex/data/leakage.py`, `tests/test_config.py`, `docs/bank_marketing.md`
 
-### B.3 Features
-- [ ] Make the lead-specific feature code config-driven; add bank features (e.g. "contacted before" from `pdays`).
+### B.3 Features ✅
+- [x] `add_features()` is config-driven (`presence_only`, `ratios`, `flags`, `bins`, `drop`); lead features moved to config with identical results (test PR-AUC 0.7874).
+- [x] Explanations are config-driven (`explain.labels`, `explain.groups`); yes/no fields read "yes" / "no"; figure folders are created when missing.
+- [x] Bank ideas tested with CV on the train split: `age_group` instead of `age` (+0.013 PR-AUC) kept; "contacted before" flag and balance bands rejected (no gain beyond noise).
+- **Files:** `src/apex/data/features.py`, `src/apex/models/explain.py`, `src/apex/models/predict.py`, `src/apex/models/train.py`, `config.json`, `config_bank.json`, tests, `docs/bank_marketing.md`, `docs/features.md`, `reports/figures/bank/explain_importance.png`
 
 ### B.4 Model, evaluation, segments
 - [ ] Split, baseline, CV, tuning (class weights at 11.7%), test evaluation, calibration, segments.
@@ -298,3 +301,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-06 | 5 | Outcomes: `prediction_id` + `POST /outcomes` + performance check. Simulation: behavior change with unchanged inputs → drift checks green, real PR-AUC 0.787 → 0.571, High precision 83% → 64% → retraining recommended. 101 tests. |
 | 2026-10-07 | B.1 | Bank Marketing data: UCI download (nested zip), `config_bank.json` with separate paths, loader handles `;`, yes/no target, missing id; same `clean()` through config only → 45,211 × 17, 0 nulls, 11.7% positive. |
 | 2026-10-07 | B.2 | Bank leakage audit: `duration` caught by the with/without check (+0.16 PR-AUC, biggest gain); also removed `campaign`, `day`, `month`, `contact` (not known before the call / time-period markers). Base 0.34 PR-AUC vs. 0.117 random. File is date-ordered (conversion 3% → 47%). |
+| 2026-10-07 | B.3 | Config-driven features and explanations (lead results identical). Bank: `age_group` replaces `age` (CV PR-AUC 0.344 → 0.356); top drivers: housing loan, previous campaigns (success → 65%), marital status, age. |

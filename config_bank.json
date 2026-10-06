@@ -89,8 +89,20 @@
     "rare_category_min_share": 0.01
   },
   "features": {
-    "drop": [],
-    "presence_only": []
+    "drop": [
+      "age"
+    ],
+    "presence_only": [],
+    "ratios": {},
+    "flags": {},
+    "bins": {
+      "age": [
+        25,
+        35,
+        45,
+        60
+      ]
+    }
   },
   "model": {
     "C": 1.0,
@@ -122,5 +134,24 @@
     "performance_drop_warning": 0.05,
     "performance_drop_drift": 0.1,
     "unseen_category_label": "__other__"
+  },
+  "explain": {
+    "labels": {
+      "age_group": "Age",
+      "job": "Job",
+      "marital": "Marital status",
+      "education": "Education",
+      "default": "Credit in default",
+      "balance": "Balance (\u20ac)",
+      "housing": "Housing loan",
+      "loan": "Personal loan"
+    },
+    "groups": {
+      "Previous campaigns": [
+        "pdays",
+        "previous",
+        "poutcome"
+      ]
+    }
   }
 }

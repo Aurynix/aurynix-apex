@@ -14,7 +14,7 @@ The bank config has its own paths (`models/bank/`, `reports/figures/bank/`, `dat
 |---|---|
 | B.1 Data collection & quality | ✅ this page, sections 1–2 |
 | B.2 Leakage audit (`duration`) | ✅ section 4 |
-| B.3 Features | ⏳ |
+| B.3 Features | ✅ section 5 |
 | B.4 Model, evaluation, segments | ⏳ |
 | B.5 Report and comparison with the lead model | ⏳ |
 
@@ -127,7 +127,44 @@ Conversion grows from 3% to 47% across the file, so a **random split** mixes old
 
 ## 5. Features (B.3)
 
-⏳
+```bash
+APEX_CONFIG=config_bank.json make features   # 45,211 rows: 17 raw columns → 34 model inputs
+APEX_CONFIG=config_bank.json make explain    # what drives the score, example reasons
+```
+
+**No bank-specific code.** `add_features()` was made config-driven with small building blocks (`config → features`): `presence_only`, `ratios`, `flags`, `bins`, `drop`. The lead features (`time_per_visit`, `has_web_activity`) are now config too, and the lead model gives exactly the same results (test PR-AUC 0.7874). The same goes for explanations: readable names and grouped reasons come from `config → explain`.
+
+**Ideas tested** (5-fold CV on the bank train split, 27,126 clients; Logistic Regression; ± is the fold-to-fold spread):
+
+| Variant | CV PR-AUC | Recall top 20% | Decision |
+|---|---|---|---|
+| Base: the 11 kept columns | 0.3435 ± 0.018 | 47.0% | — |
+| + `previously_contacted` (pdays > −1) | 0.3432 ± 0.018 | 47.0% | ❌ adds nothing: `poutcome = Missing` already means "never contacted" |
+| + `age_group` (≤ 25, 25–35, 35–45, 45–60, > 60) | 0.3560 ± 0.015 | 48.5% | ✅ age is U-shaped (≤ 25: 24%, 35–60: ~10%, > 60: 42%), which a straight line can't follow |
+| `age_group` **instead of** `age` | **0.3562 ± 0.015** | **48.5%** | ✅ **chosen**: same score, one column fewer |
+| + `balance` bands (0, 500, 2,000, 10,000) | 0.3589 ± 0.015 | 49.2% | ❌ +0.003, well inside the noise; simpler wins |
+
+**Final features** (`config_bank.json → features`): `age` → `age_group`; everything else as cleaned: `job`, `marital`, `education`, `default`, `balance`, `housing`, `loan`, `pdays`, `previous`, `poutcome`. One-hot encoding and scaling as for the leads.
+
+**What drives the score** (validation split, model fitted on train):
+
+![What drives the score](../reports/figures/bank/explain_importance.png)
+
+| Field | Mean \|contribution\| | Direction |
+|---|---|---|
+| Housing loan | 0.33 | has one → less likely (7.7% vs. 16.7%) |
+| Previous campaigns (`pdays`, `previous`, `poutcome` as one reason) | 0.25 | a previous **success** → much more likely (64.7%) |
+| Marital status | 0.13 | single → more likely |
+| Age | 0.13 | ≤ 25 and > 60 → more likely |
+| Job, education, personal loan | 0.09–0.11 | retired / students, tertiary education → more likely; personal loan → less |
+| Balance, credit in default | ≤ 0.04 | small |
+
+Example reasons (`explain_one`), as a bank agent would see them:
+
+| Score | Reasons up | Reasons down |
+|---|---|---|
+| 0.912 | Previous campaigns = pdays 97, previous 1, poutcome success · Age = ≤ 25 · Balance (€) = 23878 | Education = secondary |
+| 0.014 | — | Credit in default = yes · Job = housemaid · Personal loan = yes |
 
 ## 6. Model and results (B.4)
 

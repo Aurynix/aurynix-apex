@@ -7,10 +7,10 @@ For Logistic Regression, SHAP values have an exact closed form:
 in log-odds, on the model's input features (scaled numbers, one-hot columns).
 This is what `shap.LinearExplainer` computes; tests check that both agree.
 One-hot columns of the same raw field are summed, so a reason reads
-"Occupation = Working Professional", not 5 separate columns. The four website
-features are summed into one "Website activity" reason: they work together
-(no visit converts better than a short visit), so showing them separately
-would give a rep contradicting reasons.
+"Occupation = Working Professional", not 5 separate columns. Fields that work
+together are summed into one reason (`config → explain.groups`), e.g. the four
+website inputs into "Website activity": shown separately they would give a rep
+contradicting reasons. Readable names come from `config → explain.labels`.
 
 Run `python -m apex.models.explain` (or `make explain`) for the global
 ranking, a figure, and a few example leads.
@@ -22,14 +22,17 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-WEB = ["Total Time Spent on Website", "TotalVisits", "time_per_visit", "has_web_activity"]
-LABELS = {
-    "Lead Origin": "Lead origin",
-    "Lead Source": "Lead source",
-    "Do Not Email": "Opted out of email",
-    "Specialization": "Specialization",
-    "What is your current occupation": "Occupation",
-}
+from apex.config import load_config
+
+
+def labels() -> dict[str, str]:
+    """Readable names for fields (`config → explain.labels`)."""
+    return load_config()["explain"]["labels"]
+
+
+def groups() -> dict[str, list[str]]:
+    """Fields summed into one reason (`config → explain.groups`)."""
+    return load_config()["explain"]["groups"]
 
 
 @dataclass
@@ -60,7 +63,7 @@ class Explainer:
         ):
             reasons = [
                 {
-                    "feature": LABELS.get(f, f),
+                    "feature": labels().get(f, f),
                     "value": _readable(lead_values, f),
                     "impact": round(float(v), 3),
                 }
@@ -83,7 +86,7 @@ class Explainer:
     def importance(self, leads: pd.DataFrame) -> pd.Series:
         """Global importance: mean absolute contribution per raw field, largest first."""
         mean_abs = self.contributions(leads).abs().mean()
-        return mean_abs.rename(index=lambda f: LABELS.get(f, f)).sort_values(ascending=False)
+        return mean_abs.rename(index=lambda f: labels().get(f, f)).sort_values(ascending=False)
 
     def _input_names(self) -> list[str]:
         return list(self.model[0][-1].get_feature_names_out())
@@ -94,7 +97,9 @@ class Explainer:
         fields = []
         for name in self._input_names():
             match = [c for c in categorical if name.startswith(f"{c}_")]
-            fields.append(match[0] if match else "Website activity" if name in WEB else name)
+            field = match[0] if match else name
+            group = [g for g, members in groups().items() if field in members]
+            fields.append(group[0] if group else field)
         return fields
 
 
@@ -104,11 +109,15 @@ def _encode(model: Pipeline, leads: pd.DataFrame) -> np.ndarray:
 
 
 def _readable(values: pd.Series, field: str) -> str:
-    """The lead's value of a field, as a short text."""
-    if field == "Website activity":
+    """A field's value for one row, as a short text."""
+    if field == "Website activity":  # lead data: the clearest wording for sales reps
         visits, minutes = values["TotalVisits"], values["Total Time Spent on Website"] / 60
         return f"{visits:.0f} visit{'' if visits == 1 else 's'}, {minutes:.0f} min on site"
-    if field == "Do Not Email":
+    if field in groups():
+        return ", ".join(
+            f"{labels().get(c, c)} {values[c]}" for c in groups()[field] if c in values
+        )
+    if field in load_config()["data"]["binary_columns"]:
         return "yes" if values[field] == 1 else "no"
     return str(values[field])
 
@@ -132,6 +141,7 @@ def run() -> pd.Series:
     print("Global importance (mean |log-odds contribution|, validation):\n")
     print(ranking.round(3).to_string(), "\n")
     figure = path("figures_dir") / "explain_importance.png"
+    figure.parent.mkdir(parents=True, exist_ok=True)
     _plot_importance(ranking, figure)
 
     scores = model.predict_proba(X_val)[:, 1]
