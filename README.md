@@ -363,17 +363,17 @@ Drift shows that the **data** changed, not that the model is **wrong**. Once con
 | Layer | Tools |
 |---|---|
 | Language | Python 3.11 |
-| Data | pandas, NumPy, PyArrow |
+| Data | pandas, NumPy |
 | Modeling | scikit-learn (Logistic Regression) |
 | Tuning | scikit-learn grid search |
 | Experiment Tracking | MLflow |
-| Explainability | SHAP |
-| Visualization | Matplotlib, Seaborn |
+| Explainability | Exact linear SHAP (own code, checked against `shap` in tests) |
+| Visualization | Matplotlib |
 | API | FastAPI, Uvicorn, Pydantic |
 | Persistence | SQLite |
-| Monitoring | Custom PSI, Evidently (reports) |
+| Monitoring | Own PSI code, JSON reports |
 | Demo | Streamlit |
-| Container | Docker, Docker Compose |
+| Container & CI/CD | Docker, Docker Compose, GitHub Actions, GHCR |
 | Environment | uv (`pyproject.toml` + `uv.lock`) |
 | Code Quality | Ruff, pytest |
 
