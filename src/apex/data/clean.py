@@ -18,7 +18,7 @@ import pandas as pd
 
 from apex.config import load_config
 
-YES_NO = {"Yes": 1, "No": 0}
+YES_NO = {"yes": 1, "no": 0}  # compared in lower case: "Yes" and "yes" both work
 
 
 def normalize_text(df: pd.DataFrame) -> pd.DataFrame:
@@ -47,15 +47,16 @@ def apply_aliases(df: pd.DataFrame, aliases: dict[str, dict[str, str]]) -> pd.Da
 
 
 def encode_binary(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    """Encode Yes/No columns as 1/0; anything else is an error."""
+    """Encode Yes/No columns (any letter case) as 1/0; anything else is an error."""
     df = df.copy()
     for col in columns:
         if col not in df.columns:
             continue
-        unexpected = set(df[col].dropna().unique()) - set(YES_NO)
+        values = df[col].str.lower()
+        unexpected = set(df[col][values.notna() & ~values.isin(YES_NO)])
         if unexpected:
             raise ValueError(f"{col!r} has non Yes/No values: {sorted(unexpected)}")
-        df[col] = df[col].map(YES_NO).astype("Int8")
+        df[col] = values.map(YES_NO).astype("Int8")
     return df
 
 

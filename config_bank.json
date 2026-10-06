@@ -1,0 +1,105 @@
+{
+  "project": {
+    "name": "aurynix-apex-bank",
+    "model_version": "apex-bank-v0.1.0"
+  },
+  "paths": {
+    "raw_dir": "data/raw",
+    "models_dir": "models/bank",
+    "figures_dir": "reports/figures/bank",
+    "monitoring_reports_dir": "reports/monitoring/bank",
+    "database": "data/apex_bank.db",
+    "splits": "data/splits_bank.csv",
+    "mlflow_tracking_uri": "sqlite:///mlflow.db"
+  },
+  "files": {
+    "raw_data": "bank-full.csv",
+    "raw_data_dictionary": "bank-names.txt",
+    "model": "model.pkl",
+    "model_meta": "model_meta.json",
+    "reference_profile": "reference_profile.json",
+    "model_card": "model_card.json",
+    "predictions": "predictions_bank.csv"
+  },
+  "source": {
+    "url": "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip",
+    "files": {
+      "bank-full.csv": "raw_data",
+      "bank-names.txt": "raw_data_dictionary"
+    }
+  },
+  "data": {
+    "target": "y",
+    "target_values": {
+      "yes": 1,
+      "no": 0
+    },
+    "csv_sep": ";",
+    "id_columns": [
+      "row_id"
+    ],
+    "missing_placeholders": [
+      "unknown"
+    ],
+    "category_aliases": {},
+    "binary_columns": [
+      "default",
+      "housing",
+      "loan"
+    ],
+    "numeric_columns": [
+      "age",
+      "day",
+      "duration",
+      "campaign",
+      "previous"
+    ],
+    "drop_columns": [],
+    "leakage_columns": [],
+    "group_other": {},
+    "missing_label": "Missing",
+    "numeric_fill": {},
+    "integer_columns": [],
+    "caps": {
+      "balance": 35000,
+      "campaign": 30,
+      "previous": 25
+    },
+    "rare_category_min_share": 0.01
+  },
+  "features": {
+    "drop": [],
+    "presence_only": []
+  },
+  "model": {
+    "C": 1.0,
+    "class_weight": null
+  },
+  "split": {
+    "random_state": 42,
+    "test_size": 0.2,
+    "val_size": 0.2
+  },
+  "serving": {
+    "input_fields": []
+  },
+  "segmentation": {
+    "high_share": 0.2,
+    "medium_share": 0.3
+  },
+  "monitoring": {
+    "psi_warning": 0.1,
+    "psi_drift": 0.25,
+    "n_bins": 10,
+    "window_days": 7,
+    "min_samples": 200,
+    "missing_rate_change_warning": 0.1,
+    "unseen_share_warning": 0.05,
+    "rejection_rate_warning": 0.05,
+    "performance_window_days": 30,
+    "min_outcomes": 200,
+    "performance_drop_warning": 0.05,
+    "performance_drop_drift": 0.1,
+    "unseen_category_label": "__other__"
+  }
+}

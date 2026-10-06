@@ -138,3 +138,8 @@ def test_clean_is_stateless(raw):
     pd.testing.assert_frame_equal(
         single.reset_index(drop=True), batch.iloc[[1]].reset_index(drop=True)
     )
+
+
+def test_encode_binary_ignores_letter_case():
+    out = encode_binary(pd.DataFrame({"loan": ["yes", "No", "YES"]}), ["loan"])
+    assert out["loan"].tolist() == [1, 0, 1]

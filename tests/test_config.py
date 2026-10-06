@@ -25,3 +25,16 @@ def test_segment_shares_are_valid():
 def test_psi_thresholds_are_ordered():
     mon = load_config()["monitoring"]
     assert 0 < mon["psi_warning"] < mon["psi_drift"]
+
+
+def test_bank_config_has_the_same_sections_as_the_lead_config():
+    import json
+
+    lead = json.loads((PROJECT_ROOT / "config.json").read_text())
+    bank = json.loads((PROJECT_ROOT / "config_bank.json").read_text())
+    assert set(bank) == set(lead)
+    assert set(bank["data"]) >= set(lead["data"]) - {"category_aliases"}
+    assert (
+        bank["paths"]["models_dir"] != lead["paths"]["models_dir"]
+    )  # never overwrite lead artifacts
+    assert bank["paths"]["splits"] != lead["paths"]["splits"]
