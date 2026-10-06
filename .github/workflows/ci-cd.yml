@@ -3,7 +3,8 @@
 # test   (every push and pull request): install from uv.lock, then `make lint` and `make test`.
 #        Tests use synthetic data, so no dataset, model, or secret is needed.
 # docker (after test passes): build the image on pull requests to prove it still builds;
-#        on main, also push it to GitHub Container Registry (ghcr.io/aurynix/aurynix-apex).
+#        on main, also push it to GitHub Container Registry (ghcr.io/aurynix/aurynix-apex);
+#        on a version tag (v0.2.0), push it as that version too.
 #        The image has no data and no model: models/ is mounted at runtime (docs/deployment.md).
 
 name: CI/CD
@@ -11,6 +12,7 @@ name: CI/CD
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -70,6 +72,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
             type=sha
 
       - name: Build (and push on main)
