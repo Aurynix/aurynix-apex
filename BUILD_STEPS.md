@@ -246,8 +246,12 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 - **Files:** `config_bank.json`, `src/apex/data/download.py`, `src/apex/data/load.py`, `src/apex/data/clean.py`, tests, `docs/bank_marketing.md`
 - **Done when:** `APEX_CONFIG=config_bank.json make data-download data-info` works and `clean(load_raw())` gives clean data with no new cleaning code.
 
-### B.2 Leakage audit
-- [ ] Classify every column against the prediction moment (before the call); run the with/without check; `duration` must stand out.
+### B.2 Leakage audit ✅
+- [x] Suspect groups moved to config (`data.leakage_suspects`) so `make leakage` works for any dataset.
+- [x] Classify every column against the prediction moment (before the call); with/without check in time-ordered and shuffled folds; `duration` stands out (+0.155 / +0.167 PR-AUC).
+- [x] Removed `duration`, `campaign`, `day`, `month`, `contact`; kept client profile and previous-campaign history (base PR-AUC 0.34 vs. 0.117 random).
+- [x] Finding for B.4: the file is ordered by date and conversion rises from 3% to 47%; report random and time splits.
+- **Files:** `config.json`, `config_bank.json`, `src/apex/data/leakage.py`, `tests/test_config.py`, `docs/bank_marketing.md`
 
 ### B.3 Features
 - [ ] Make the lead-specific feature code config-driven; add bank features (e.g. "contacted before" from `pdays`).
@@ -293,3 +297,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-06 | 5 | Removed unused dependencies (xgboost, lightgbm, optuna, evidently, seaborn, pyarrow, python-multipart; shap → dev): Docker image 3.51 GB → 1.49 GB, local env 1.2 GB; every make target and the Docker stack re-checked. |
 | 2026-10-06 | 5 | Outcomes: `prediction_id` + `POST /outcomes` + performance check. Simulation: behavior change with unchanged inputs → drift checks green, real PR-AUC 0.787 → 0.571, High precision 83% → 64% → retraining recommended. 101 tests. |
 | 2026-10-07 | B.1 | Bank Marketing data: UCI download (nested zip), `config_bank.json` with separate paths, loader handles `;`, yes/no target, missing id; same `clean()` through config only → 45,211 × 17, 0 nulls, 11.7% positive. |
+| 2026-10-07 | B.2 | Bank leakage audit: `duration` caught by the with/without check (+0.16 PR-AUC, biggest gain); also removed `campaign`, `day`, `month`, `contact` (not known before the call / time-period markers). Base 0.34 PR-AUC vs. 0.117 random. File is date-ordered (conversion 3% → 47%). |
