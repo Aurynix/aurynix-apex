@@ -61,3 +61,25 @@ Ports come from `.env` (copy `.env.example`) or the environment: `API_PORT=8020 
 | **Monitoring** | Run drift monitoring; status, segment shares vs. training, feature PSI, data quality |
 
 The sidebar shows the loaded model version, training date, and test results. If the API is not reachable, the demo says so instead of failing.
+
+## CI/CD
+
+[`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml) runs on every push to `main` and every pull request:
+
+| Job | When | What |
+|---|---|---|
+| **Lint and test** | always | `uv sync --frozen` (exact versions from `uv.lock`), `make lint`, `make test` |
+| **Docker image** | after tests pass | Pull request: build the image (proves the Dockerfile still works). `main`: build and push to `ghcr.io/aurynix/aurynix-apex` with tags `latest` and `sha-<commit>` |
+
+- **No secrets or data needed:** tests use synthetic leads and an in-memory database, so CI never downloads `Leads.csv` or needs a trained model. Pushing the image uses the built-in `GITHUB_TOKEN`.
+- **Fast reruns:** uv's package cache and Docker layers are cached between runs.
+- **Only the latest run counts:** a new push to the same branch cancels the run still in progress.
+- **The image has no model:** like locally, mount `models/` (from `make train`):
+
+```bash
+docker pull ghcr.io/aurynix/aurynix-apex:latest
+docker run -p 8000:8000 -v ./models:/app/models:ro -v ./data:/app/data ghcr.io/aurynix/aurynix-apex:latest
+```
+
+The repository is private, so the image is private too: `docker login ghcr.io` with a GitHub token that has `read:packages` first.
+
