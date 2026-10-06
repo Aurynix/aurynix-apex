@@ -24,7 +24,7 @@ One function, `clean(df)`, runs 10 small steps in a fixed order. Every rule and 
 | 1 | Normalize text | `normalize_text` | Strip spaces, collapse double spaces |
 | 2 | Hidden nulls | `replace_placeholders` | `"Select"`, `"unknown"` → missing |
 | 3 | Spelling | `apply_aliases` | `google` → `Google` |
-| 4 | Yes/No | `encode_binary` | `"Yes"`/`"No"` → `1`/`0`; any other value is an error |
+| 4 | Yes/No | `encode_binary` | `"Yes"`/`"No"` (any letter case) → `1`/`0`; any other value is an error |
 | 5 | Drop columns | `clean` | IDs, constant columns, empty column, leakage columns |
 | 6 | Group rare values | `group_other` | `Country`: India / Other |
 | 7 | Validate | `validate` | Target is 0/1, no negative numbers, no logic errors |

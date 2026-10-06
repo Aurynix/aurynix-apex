@@ -412,9 +412,9 @@ Drift shows that the **data** changed; outcomes show whether the model is still 
 ```
 aurynix-apex/
 ├── data/                          # git-ignored
-│   ├── raw/                       # Leads.csv (the only copy; cleaned in memory)
-│   ├── splits.csv                 # fixed train / val / test split
-│   └── apex.db                    # SQLite: predictions, rejected requests, drift runs
+│   ├── raw/                       # Leads.csv, bank-full.csv (the only copies; cleaned in memory)
+│   ├── splits.csv                 # fixed train / val / test split (bank: splits_bank.csv)
+│   └── apex.db                    # SQLite: predictions, outcomes, rejected requests, drift runs
 ├── docs/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
@@ -426,14 +426,15 @@ aurynix-apex/
 │   ├── models.md                  # metrics & model results
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md                     # API design & reference
-│   ├── monitoring.md              # drift monitoring & simulation
-│   └── deployment.md
+│   ├── monitoring.md              # drift, data quality, outcomes & simulations
+│   ├── deployment.md              # local, Docker, CI/CD
+│   └── bank_marketing.md          # second dataset: report & comparison
 ├── notebooks/                     # local scratch for testing (git-ignored)
 ├── src/
 │   └── apex/
-│       ├── config.py              # loads config.json
+│       ├── config.py              # loads config.json (or APEX_CONFIG)
 │       ├── data/
-│       │   ├── download.py        # Kaggle download
+│       │   ├── download.py        # Kaggle or URL (zip) download
 │       │   ├── load.py
 │       │   ├── clean.py
 │       │   ├── leakage.py         # with/without leakage check
@@ -452,25 +453,28 @@ aurynix-apex/
 │       │   ├── reference.py       # build reference_profile.json
 │       │   ├── drift.py           # PSI functions & statuses
 │       │   ├── monitor.py         # feature drift, prediction drift, data quality
-│       │   └── simulate.py        # stable vs. drifted traffic demo
+│       │   └── simulate.py        # drift and outcomes demos
 │       └── api/
 │           ├── app.py             # app, startup, /health
 │           ├── schemas.py         # request / response validation
 │           ├── dependencies.py    # load model once, inject services
-│           ├── service.py         # ScoringService: score, segment, explain, log
+│           ├── service.py         # ScoringService: score, segment, explain, log, outcomes
 │           ├── database.py        # SQLite tables
 │           └── routers/
 │               ├── model.py
 │               ├── predict.py
+│               ├── outcomes.py
 │               └── monitoring.py
 ├── app/
 │   └── demo.py                    # Streamlit demo (API client)
-├── models/                        # artifacts (git-ignored), except model_card.json
+├── models/                        # artifacts (git-ignored), except model_card.json; bank: models/bank/
 ├── reports/
-│   ├── figures/
+│   ├── figures/                   # lead charts; bank charts in figures/bank/
 │   └── monitoring/
 ├── tests/
-├── config.json
+├── .github/workflows/ci-cd.yml    # lint, test, Docker build / push
+├── config.json                    # lead dataset (default)
+├── config_bank.json               # Bank Marketing dataset
 ├── .env.example
 ├── Makefile
 ├── pyproject.toml                 # package metadata & dependencies
@@ -518,6 +522,13 @@ make docker-up     # same URLs; `make docker-down` to stop
 
 Every push and pull request runs lint, all tests, and a Docker build in GitHub Actions; merges to `main` publish the image to `ghcr.io/aurynix/aurynix-apex` ([CI/CD](docs/deployment.md#cicd)).
 
+The second dataset uses the same commands with its config:
+
+```bash
+export APEX_CONFIG=config_bank.json
+make data-download split evaluate train   # UCI → split → test once → models/bank/
+```
+
 Port 8000 or 8501 already taken? `make run API_PORT=8020`, `make demo API_PORT=8020 DEMO_PORT=8521`, or set `API_PORT` / `DEMO_PORT` in `.env` for Docker. Details: [docs/deployment.md](docs/deployment.md).
 
 The demo has three tabs: **score a lead** (form → score, segment, reasons), **score a CSV** (e.g. `Leads.csv` → ranked list), and **monitoring** (drift status).
@@ -529,7 +540,7 @@ Run `make help` for the full list.
 | Group | Command | Description |
 |---|---|---|
 | Environment | `make venv` / `make install` / `make lock` | Create venv / install locked dependencies / update `uv.lock` |
-| Data | `make data-download` | Download the Kaggle dataset into `data/raw/` |
+| Data | `make data-download` | Download the dataset into `data/raw/` (Kaggle for leads, UCI for Bank Marketing) |
 | | `make data-info` | Print shape, hash, and target rate of the raw data |
 | | `make leakage` | Compare a quick model with and without leakage suspects |
 | | `make eda` | Print EDA tables and save figures to `reports/figures/` |
