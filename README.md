@@ -31,6 +31,7 @@ It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-puls
 - [ML Pipeline](#ml-pipeline)
 - [Data Leakage Policy](#data-leakage-policy)
 - [Results](#results)
+- [Second Dataset: Bank Marketing](#second-dataset-bank-marketing)
 - [Evaluation Strategy](#evaluation-strategy)
 - [Lead Segmentation](#lead-segmentation)
 - [Explainability](#explainability)
@@ -113,10 +114,10 @@ For every lead it returns:
 - The placeholder value `"Select"` means the user did not choose an option. It is treated as missing.
 - Several columns may be filled in by sales **after** contact (see [Data Leakage Policy](#data-leakage-policy)).
 
-### Secondary (in progress): Bank Marketing Dataset (UCI, id 222)
+### Secondary: Bank Marketing Dataset (UCI, id 222)
 - Used to prove the pipeline is reusable on a second, highly imbalanced dataset.
 - Contains a well-known leakage feature (`duration`, the call length, only known after the call).
-- 45,211 clients, 11.7% subscribed. Progress and findings: [docs/bank_marketing.md](docs/bank_marketing.md).
+- 45,211 clients, 11.7% subscribed. Results: [Second Dataset](#second-dataset-bank-marketing) and [docs/bank_marketing.md](docs/bank_marketing.md).
 
 > Raw data is never committed to this repository.
 
@@ -200,6 +201,23 @@ Final model: **Logistic Regression** on 24 features built from 7 raw lead fields
 **Model card:** [`models/model_card.json`](models/model_card.json): data, algorithm, performance, risk rating (overall **Low**), limitations, and monitoring plan.
 
 The test score is lower than validation (0.839) and cross-validation (0.818 ± 0.011). The test leads have the same mix as the other splits, and the 95% intervals of validation and test meet near the CV average, so this is sampling variation; the expected PR-AUC on new leads is about **0.80 ± 0.03**. Details: [docs/models.md](docs/models.md).
+
+---
+
+## Second Dataset: Bank Marketing
+
+The same pipeline, run on UCI Bank Marketing with **configuration only** (`APEX_CONFIG=config_bank.json`): 45,211 bank clients, 11.7% subscribed to a term deposit after a phone campaign. Full report: [docs/bank_marketing.md](docs/bank_marketing.md).
+
+| | Leads | Bank Marketing |
+|---|---|---|
+| Rows · conversion | 9,240 · 38.5% | 45,211 · 11.7% |
+| Leakage caught by the with/without check | `Tags` (+0.148 PR-AUC) | **`duration`** (+0.16), the call length, known only after the call |
+| Test PR-AUC (vs. random) | 0.787 (2.0×) | 0.359 (3.1×) |
+| Top 20%: share of calls that convert · share of all conversions | 83% · 43% | 29% · 49% |
+| High vs. Low conversion | 84% vs. 12% | 29% vs. 6% |
+| Same settings held | — | Logistic Regression, `C = 1`, no class weights, raw probabilities |
+
+The bank file is in date order, which allowed a **time check**: trained on older clients and tested on newer ones, the ranking holds (ROC-AUC 0.726 → 0.707) but conversion jumps from 7% to 32%, so probabilities drift. That is why Apex monitors real outcomes and recommends retraining ([ADR-008](docs/decisions.md)).
 
 ---
 
@@ -525,6 +543,7 @@ Run `make help` for the full list.
 | | `make calibration` | Check probability calibration (raw / Platt / isotonic), save figure |
 | | `make segments` | Derive High / Medium / Low thresholds and print segment tables |
 | | `make explain` | Global feature importance and example per-lead reasons |
+| | `make time-split` | Train on older rows, test on newer (date-ordered data, e.g. Bank Marketing) |
 | | `make predict` | Score `Leads.csv` with the saved model → `data/predictions.csv` |
 | | `make pipeline` | `split` + `train` + `predict`, end to end |
 | Serving | `make run` / `make run-prod` | Start the API with the saved model (dev with reload / prod with 2 workers) |
@@ -538,9 +557,14 @@ Run `make help` for the full list.
 
 ## Configuration
 
-All paths, filenames, thresholds, and constants live in `config.json` and are loaded by `src/apex/config.py`. No hardcoded paths anywhere in the codebase.
+All paths, filenames, thresholds, and dataset choices live in a config file loaded by `src/apex/config.py`. No hardcoded paths anywhere in the codebase.
 
-Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment capacity shares, PSI thresholds, monitoring window, and minimum sample size.
+| File | Dataset | Use |
+|---|---|---|
+| `config.json` | Leads (default) | `make …` |
+| `config_bank.json` | Bank Marketing | `APEX_CONFIG=config_bank.json make …` |
+
+Each config holds: data source and file format, cleaning rules, leakage columns, feature blocks, explanation labels, model settings, split, segment capacity shares, monitoring thresholds, and its own output paths ([ADR-009](docs/decisions.md)).
 
 ## Roadmap
 
@@ -574,7 +598,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 
 ### Later
 - [x] `outcomes` table and live performance tracking
-- [ ] Apply the pipeline to the Bank Marketing dataset
+- [x] Apply the pipeline to the Bank Marketing dataset
 - [ ] Integration with Aurynix Pulse
 
 ## Design Decisions

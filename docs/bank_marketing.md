@@ -10,13 +10,27 @@ APEX_CONFIG=config_bank.json make data-info       # shape, SHA-256, conversion r
 
 The bank config has its own paths (`models/bank/`, `reports/figures/bank/`, `data/splits_bank.csv`, `data/apex_bank.db`), so it never overwrites the lead model.
 
-| Step | Status |
+## Summary
+
+**The Apex pipeline works on a second, very different dataset with configuration only:** 45,211 bank clients, 11.7% subscribed (the leads: 9,240, 38.5%). No cleaning, modelling, evaluation, or segmentation code was written for the bank; the general parts that were lead-specific (download source, file format, feature and explanation definitions) were turned into config.
+
+| Finding | Evidence |
 |---|---|
-| B.1 Data collection & quality | ✅ this page, sections 1–2 |
-| B.2 Leakage audit (`duration`) | ✅ section 4 |
-| B.3 Features | ✅ section 5 |
-| B.4 Model, evaluation, segments | ✅ section 6 |
-| B.5 Report and comparison with the lead model | ⏳ |
+| **The leakage audit catches `duration` by itself** | Biggest gain in the with/without check: +0.155 / +0.167 PR-AUC (section 4), as `Tags` was for the leads (+0.148) |
+| **The model ranks clients well** | Test PR-AUC **0.359** vs. 0.117 random (3.1×); the top 20% hold **49%** of subscribers, and 29% of those calls succeed (random: 11.7%) |
+| **The same design decisions hold** | Logistic Regression, `C = 1`, no class weights (`balanced` doubles the Brier score), raw probabilities (ECE 0.009), capacity-based segments (High 28.6% vs. Low 5.8%) |
+| **Ranking carries over in time; probabilities do not** | Trained on older clients, tested on newer ones: ROC-AUC 0.726 → 0.707, but conversion jumps 6.7% → 31.6% and calibration error 0.009 → 0.163. Retrain regularly; the outcomes check catches this |
+| **New useful feature block** | `age_group` (U-shaped age effect): CV PR-AUC 0.344 → 0.356 |
+
+**Scope:** pipeline and report. The bank model is saved in `models/bank/` but has no API, demo, monitoring, or model card of its own (`card.py` describes the lead product).
+
+| Step | Section |
+|---|---|
+| B.1 Data collection & quality | 1–3 |
+| B.2 Leakage audit | 4 |
+| B.3 Features | 5 |
+| B.4 Model, evaluation, segments, time split | 6 |
+| B.5 Comparison with the lead model | 7 |
 
 ---
 
@@ -250,3 +264,25 @@ The file is in date order, so `make time-split` trains on the **oldest 80%** of 
 ### Final model
 
 `make train` fits the final model on all 45,211 clients → `models/bank/model.pkl`, `model_meta.json`, `reference_profile.json` (out-of-fold PR-AUC 0.360). No model card: `card.py` describes the lead product (`config_bank.json → project.model_card = false`).
+
+## 7. Leads vs. Bank Marketing
+
+| | Leads (X Education) | Bank Marketing (UCI) |
+|---|---|---|
+| Rows · conversion | 9,240 · 38.5% | 45,211 · **11.7%** |
+| Leakage caught | `Tags` (+0.148 PR-AUC) and 8 more columns | `duration` (+0.16) and 4 more columns |
+| Raw fields used · model inputs | 7 · 24 | 11 · 34 |
+| Test PR-AUC (vs. random) | 0.787 (2.0×) | 0.359 (**3.1×**) |
+| Test ROC-AUC | 0.855 | 0.726 |
+| Top 20%: precision · recall | 83.2% · 43.3% | 28.9% · 49.4% |
+| Calibration error (ECE) | 0.031 (out-of-fold) | 0.005 (out-of-fold) |
+| High vs. Low conversion | 84.1% vs. 11.8% (7.1×) | 28.6% vs. 5.8% (4.9×) |
+| Settings | `C = 1`, no class weights, raw probabilities | the same |
+| Time check | not possible (no dates) | ranking holds, probabilities drift |
+
+**What was general from the start:** cleaning (`clean()`), the leakage check, the split, the model and its settings, CV and tuning, evaluation and calibration, capacity-based segments, the explanation method.
+
+**What had to become configuration:** the download source (Kaggle or a URL, zips inside zips), the file format (separator, target labels, a missing id column), the leakage suspects, feature building blocks (`ratios`, `flags`, `bins`, …), explanation names and groups, the MLflow experiment, and whether a model card is written ([ADR-009](decisions.md)).
+
+**What still needs a person:** deciding what is known at the prediction moment (the leakage audit), and choosing features. The pipeline measures; a person decides.
+

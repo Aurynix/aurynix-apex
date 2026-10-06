@@ -228,7 +228,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 ## Phase 5 — Later
 
 - [x] `outcomes` table and live performance tracking: `prediction_id` in every prediction, `POST /outcomes`, performance check (real PR-AUC and High precision vs. test, `retrain_recommended`), `make outcomes-demo` (ADR-008).
-- [ ] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage: in progress as Phase 6.
+- [x] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage: done in Phase 6.
 - [ ] Integration with Aurynix Pulse.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
 - [x] Remove unused dependencies (`xgboost`, `lightgbm`, `optuna`, `evidently`, `seaborn`, `pyarrow`, `python-multipart`; `shap` moved to dev): smaller installs and Docker image.
@@ -265,8 +265,8 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 - [x] Time split: ranking holds (ROC-AUC 0.726 → 0.707), probabilities do not (ECE 0.163; conversion 6.7% → 31.6%).
 - **Files:** `src/apex/models/train.py`, `src/apex/models/cv.py`, `src/apex/models/segment.py`, `config.json`, `config_bank.json`, `Makefile`, `docs/bank_marketing.md`, `reports/figures/bank/`
 
-### B.5 Report
-- [ ] Complete `docs/bank_marketing.md`; README section comparing both datasets.
+### B.5 Report ✅
+- [x] Summary and lead-vs-bank comparison in `docs/bank_marketing.md`; README section "Second Dataset"; configuration section lists both configs; ADR-009 (one pipeline, one config per dataset).
 
 
 ## Log
@@ -306,3 +306,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-07 | B.2 | Bank leakage audit: `duration` caught by the with/without check (+0.16 PR-AUC, biggest gain); also removed `campaign`, `day`, `month`, `contact` (not known before the call / time-period markers). Base 0.34 PR-AUC vs. 0.117 random. File is date-ordered (conversion 3% → 47%). |
 | 2026-10-07 | B.3 | Config-driven features and explanations (lead results identical). Bank: `age_group` replaces `age` (CV PR-AUC 0.344 → 0.356); top drivers: housing loan, previous campaigns (success → 65%), marital status, age. |
 | 2026-10-07 | B.4 | Bank model: test PR-AUC 0.359 (3.1× random), top 20% recall 49% / precision 29%, ECE 0.009; High 28.6% vs. Low 5.8%. Time split: ranking holds (ROC-AUC 0.707), probabilities do not (ECE 0.163). |
+| 2026-10-07 | B.5 | Phase 6 report: bank summary and comparison with leads, README "Second Dataset", ADR-009. Phase 6 complete. |
