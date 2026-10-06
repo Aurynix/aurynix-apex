@@ -12,6 +12,7 @@ Short records of decisions that shape the model and the system. Newest last.
 | [006](#adr-006-api-thin-routers-one-scoring-service-no-training-in-the-api) | API: thin routers, one scoring service, no training in the API | 4.1 |
 | [007](#adr-007-drift-monitoring-with-own-psi-code-and-three-checks) | Drift monitoring with own PSI code and three checks | 4.4 |
 | [008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check) | Real outcomes by prediction id and a performance check | 5 |
+| [009](#adr-009-one-pipeline-one-config-per-dataset) | One pipeline, one config per dataset | 6 |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -150,4 +151,18 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 **Why.** It closes the loop with the smallest change: one table, one endpoint, one check, using the prediction log that already exists. Evidence: in a simulation where behavior changes but inputs do not, all drift checks stay green, while PR-AUC falls from 0.787 to 0.571 and retraining is recommended ([monitoring.md](monitoring.md)).
 
 **Consequences.** Outcomes mostly come from leads that were called, which are mostly High, so measured performance leans toward the model's own choices (feedback loop). Recommended, not built: call a small random sample of Medium / Low leads too. Retraining itself stays manual (`make train`, ADR-006).
+
+---
+
+## ADR-009: One pipeline, one config per dataset
+
+- **Date:** 2026-10-07 · **Step:** Phase 6 · **Status:** Accepted
+
+**Context.** The pipeline was built for the lead data. A second dataset (UCI Bank Marketing) showed which parts were general and which assumed the lead data: the download source, the file format, the leakage suspects, the feature definitions, the explanation labels.
+
+**Decision.** Keep one pipeline and describe each dataset in its own config file, selected with `APEX_CONFIG` (default `config.json`, bank: `config_bank.json`). Dataset-specific choices are configuration: source, file format (`csv_sep`, `target_values`, id column), cleaning rules, `leakage_suspects` / `leakage_columns`, feature blocks (`presence_only`, `ratios`, `flags`, `bins`, `drop`), `explain` labels and groups, MLflow `experiment`, `model_card`, `time_ordered`. Each config has its own output paths.
+
+**Why.** The bank data ran end to end with no new cleaning, modelling, evaluation, or segmentation code, and the lead model gave identical results after each change (test PR-AUC 0.7874). Small, named building blocks keep the config readable; anything that needs real logic stays in code.
+
+**Consequences.** A new dataset = a new config + a leakage audit + feature choices; the audit and the choices stay human decisions. The API, demo, monitoring, and model card text still describe the lead product; serving a second dataset would need its own API schema (not built).
 
