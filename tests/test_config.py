@@ -38,3 +38,13 @@ def test_bank_config_has_the_same_sections_as_the_lead_config():
         bank["paths"]["models_dir"] != lead["paths"]["models_dir"]
     )  # never overwrite lead artifacts
     assert bank["paths"]["splits"] != lead["paths"]["splits"]
+
+
+def test_each_config_lists_leakage_suspects():
+    import json
+
+    for name in ("config.json", "config_bank.json"):
+        data = json.loads((PROJECT_ROOT / name).read_text())["data"]
+        suspects = {c for cols in data["leakage_suspects"].values() for c in cols}
+        assert suspects, name
+        assert set(data["leakage_columns"]) <= suspects, name

@@ -13,7 +13,7 @@ The bank config has its own paths (`models/bank/`, `reports/figures/bank/`, `dat
 | Step | Status |
 |---|---|
 | B.1 Data collection & quality | ✅ this page, sections 1–2 |
-| B.2 Leakage audit (`duration`) | ⏳ |
+| B.2 Leakage audit (`duration`) | ✅ section 4 |
 | B.3 Features | ⏳ |
 | B.4 Model, evaluation, segments | ⏳ |
 | B.5 Report and comparison with the lead model | ⏳ |
@@ -93,7 +93,37 @@ The **same `clean()` as for the leads** runs on this data; only `config_bank.jso
 
 ## 4. Leakage audit (B.2)
 
-⏳
+**The test for every column:** *does the bank know this before it calls the client in this campaign?* Suspects are listed in `config_bank.json → data.leakage_suspects`; the check is the same code as for the leads:
+
+```bash
+APEX_CONFIG=config_bank.json make leakage
+```
+
+A quick Logistic Regression (5-fold CV, PR-AUC) is scored on the cleaned data without any suspect, then with each group added. Random guessing scores 0.117.
+
+The file is **sorted by date** (May 2008 → Nov 2010), and conversion changes a lot over time (3% in the oldest tenth of the rows, 47% in the newest). So the check is run twice: with folds in file order (each fold ≈ a time period) and with shuffled folds.
+
+| Group | Known before the call? | Gain, time-ordered folds | Gain, shuffled folds | Decision |
+|---|---|---|---|---|
+| — base (no suspects) | — | PR-AUC 0.340 | PR-AUC 0.347 | — |
+| `duration` | ❌ length of the last call: only known **after** it; a 0-second call is always "no" | **+0.155** | **+0.167** | ❌ **Leakage** |
+| `campaign` | ❌ calls in this campaign, **including** the one being predicted | −0.002 | +0.007 | ❌ Remove (not known before; adds nothing) |
+| `day`, `month` | ❌ date of the last call; mostly encodes the 2008–2010 calendar | **−0.199** | +0.039 | ❌ Remove (not known before; does not carry over to another period) |
+| `contact` | ⚠️ cellular / telephone is on file, but `unknown` marks the **first months** of data collection (100% of the oldest 20% of rows, ~0% later) | +0.097 | +0.011 | ❌ Remove to be safe: its gain comes from the time period, not the client |
+
+**Result: the audit catches `duration` by itself.** It is the biggest gain in both checks (about +45% PR-AUC), just as `Tags` was for the leads (+0.148). The publishers say the same in the notes of the dataset's other version (`bank-additional-names.txt`): "the duration is not known before a call is performed … this input should only be included for benchmark purposes and should be discarded if the intention is to have a realistic predictive model."
+
+**Removed:** `duration`, `campaign`, `day`, `month`, `contact` (`config_bank.json → data.leakage_columns`).
+
+**Kept:** what the bank knows before calling:
+- client profile: `age`, `job`, `marital`, `education`, `default`, `balance`, `housing`, `loan`
+- history with earlier campaigns: `pdays`, `previous`, `poutcome`
+
+These give PR-AUC **0.34**, about **3× random** (0.117), before any feature work or tuning. The cleaned data: 45,211 rows × 11 features + target.
+
+### Finding for B.4: time matters
+
+Conversion grows from 3% to 47% across the file, so a **random split** mixes old and new clients, while a **time split** (train on older, test on newer) is closer to real use. B.4 reports both.
 
 ## 5. Features (B.3)
 

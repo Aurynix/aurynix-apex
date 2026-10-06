@@ -30,10 +30,18 @@
   },
   "data": {
     "target": "Converted",
-    "id_columns": ["Prospect ID", "Lead Number"],
-    "missing_placeholders": ["Select", "unknown"],
+    "id_columns": [
+      "Prospect ID",
+      "Lead Number"
+    ],
+    "missing_placeholders": [
+      "Select",
+      "unknown"
+    ],
     "category_aliases": {
-      "Lead Source": { "google": "Google" }
+      "Lead Source": {
+        "google": "Google"
+      }
     },
     "binary_columns": [
       "Do Not Email",
@@ -70,15 +78,41 @@
       "Asymmetrique Activity Score",
       "Asymmetrique Profile Score"
     ],
+    "leakage_suspects": {
+      "Tags": [
+        "Tags"
+      ],
+      "Lead Quality": [
+        "Lead Quality"
+      ],
+      "Last Activity": [
+        "Last Activity",
+        "Last Notable Activity"
+      ],
+      "Asymmetrique": [
+        "Asymmetrique Activity Index",
+        "Asymmetrique Profile Index",
+        "Asymmetrique Activity Score",
+        "Asymmetrique Profile Score"
+      ],
+      "Lead Profile": [
+        "Lead Profile"
+      ]
+    },
     "group_other": {
-      "Country": ["India"]
+      "Country": [
+        "India"
+      ]
     },
     "missing_label": "Missing",
     "numeric_fill": {
       "TotalVisits": 3,
       "Page Views Per Visit": 2
     },
-    "integer_columns": ["TotalVisits", "Total Time Spent on Website"],
+    "integer_columns": [
+      "TotalVisits",
+      "Total Time Spent on Website"
+    ],
     "caps": {
       "TotalVisits": 30,
       "Page Views Per Visit": 15
@@ -93,7 +127,9 @@
       "Country",
       "A free copy of Mastering The Interview"
     ],
-    "presence_only": ["Specialization"]
+    "presence_only": [
+      "Specialization"
+    ]
   },
   "model": {
     "C": 1.0,

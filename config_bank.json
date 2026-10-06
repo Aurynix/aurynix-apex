@@ -55,7 +55,28 @@
       "previous"
     ],
     "drop_columns": [],
-    "leakage_columns": [],
+    "leakage_columns": [
+      "duration",
+      "campaign",
+      "day",
+      "month",
+      "contact"
+    ],
+    "leakage_suspects": {
+      "duration (length of the last call)": [
+        "duration"
+      ],
+      "campaign (calls in this campaign, incl. the last)": [
+        "campaign"
+      ],
+      "day, month (date of the last call)": [
+        "day",
+        "month"
+      ],
+      "contact (type of the last call)": [
+        "contact"
+      ]
+    },
     "group_other": {},
     "missing_label": "Missing",
     "numeric_fill": {},
