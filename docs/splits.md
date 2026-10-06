@@ -22,7 +22,7 @@ make split   # creates data/splits.csv (Prospect ID → train / val / test)
 
 ## Saved, not recomputed
 
-The split is saved as `data/splits.csv` (`Prospect ID`, `split`). Every later step reads that file with `load_splits()`, so the split never changes, even if a library update changes how shuffling works. Running `make split` twice gives the same file (MD5 `f22420a3…`). The file is git-ignored like the rest of `data/`; `make split` re-creates it from `Leads.csv` (pinned by its SHA-256 in [data_dictionary.md](data_dictionary.md)).
+The split is saved as `data/splits.csv` (`Prospect ID`, `split`); the path comes from `config → paths.splits` (Bank Marketing: `data/splits_bank.csv`, keyed by `row_id`). Every later step reads that file with `load_splits()`, so the split never changes, even if a library update changes how shuffling works. Running `make split` twice gives the same file (MD5 `f22420a3…`). The file is git-ignored like the rest of `data/`; `make split` re-creates it from `Leads.csv` (pinned by its SHA-256 in [data_dictionary.md](data_dictionary.md)).
 
 ## The test set rule
 

@@ -58,7 +58,7 @@ Ports come from `.env` (copy `.env.example`) or the environment: `API_PORT=8020 
 |---|---|
 | **Score a lead** | Form → probability, High / Medium / Low, reasons up and down |
 | **Score a CSV** | Upload leads (API field names, or the raw Kaggle columns such as `Leads.csv`) → ranked list with segment and top reasons; download as CSV |
-| **Monitoring** | Run drift monitoring; status, segment shares vs. training, feature PSI, data quality |
+| **Monitoring** | Run monitoring; status, "retraining recommended", performance on real outcomes, segment shares vs. training, feature PSI, data quality |
 
 The sidebar shows the loaded model version, training date, and test results. If the API is not reachable, the demo says so instead of failing.
 

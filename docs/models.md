@@ -331,7 +331,7 @@ The test split has done its job (step 3.1), so the **final model is fitted on al
 
 ### Model card
 
-[`models/model_card.json`](../models/model_card.json) is a JSON summary for anyone deciding whether to trust and use the model. It is rebuilt on every `make train` ([`card.py`](../src/apex/models/card.py)), so its numbers always match the saved model.
+[`models/model_card.json`](../models/model_card.json) is a JSON summary for anyone deciding whether to trust and use the model. It is rebuilt on every `make train` ([`card.py`](../src/apex/models/card.py)), so its numbers always match the saved model. The card's text describes the lead product, so it is only written when `config → project.model_card` is true (Bank Marketing: false).
 
 | Section | What it answers |
 |---|---|
