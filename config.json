@@ -1,7 +1,9 @@
 {
   "project": {
     "name": "aurynix-apex",
-    "model_version": "apex-v0.1.0"
+    "model_version": "apex-v0.1.0",
+    "experiment": "apex-lead-scoring",
+    "model_card": true
   },
   "paths": {
     "raw_dir": "data/raw",
@@ -151,7 +153,8 @@
   "split": {
     "random_state": 42,
     "test_size": 0.2,
-    "val_size": 0.2
+    "val_size": 0.2,
+    "time_ordered": false
   },
   "serving": {
     "input_fields": [

@@ -62,13 +62,13 @@ def run() -> dict[str, float]:
     oof = out_of_fold_scores(make_model(cfg), X, y, cfg)
     cutoffs = thresholds(oof, cfg)
     print(f"Thresholds: High ≥ {cutoffs['high']:.3f}, Medium ≥ {cutoffs['medium']:.3f}\n")
-    print(f"Out-of-fold, train + validation ({len(X):,} leads)")
+    print(f"Out-of-fold, train + validation ({len(X):,} rows)")
     print(segment_table(y, assign(oof, cutoffs)).round(3).to_string(), "\n")
 
     test = parts["test"]
     model = make_model(cfg).fit(X, y)  # the step 3.1 model
     test_scores = model.predict_proba(test.drop(columns=[target]))[:, 1]
-    print(f"Test, step 3.1 model ({len(test):,} leads)")
+    print(f"Test, step 3.1 model ({len(test):,} rows)")
     print(segment_table(test[target], assign(test_scores, cutoffs)).round(3).to_string())
     return cutoffs
 

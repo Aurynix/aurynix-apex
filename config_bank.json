@@ -1,7 +1,9 @@
 {
   "project": {
     "name": "aurynix-apex-bank",
-    "model_version": "apex-bank-v0.1.0"
+    "model_version": "apex-bank-v0.1.0",
+    "experiment": "apex-bank-marketing",
+    "model_card": false
   },
   "paths": {
     "raw_dir": "data/raw",
@@ -111,10 +113,23 @@
   "split": {
     "random_state": 42,
     "test_size": 0.2,
-    "val_size": 0.2
+    "val_size": 0.2,
+    "time_ordered": true
   },
   "serving": {
-    "input_fields": []
+    "input_fields": [
+      "age",
+      "job",
+      "marital",
+      "education",
+      "default",
+      "balance",
+      "housing",
+      "loan",
+      "pdays",
+      "previous",
+      "poutcome"
+    ]
   },
   "segmentation": {
     "high_share": 0.2,

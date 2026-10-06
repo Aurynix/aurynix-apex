@@ -9,6 +9,7 @@ Commands:
     python -m apex.models.train test        # step 3.1: train + val → test, ONCE (`make evaluate`)
     python -m apex.models.train calibration # step 3.2: calibration check (`make calibration`)
     python -m apex.models.train final       # step 3.5: save the final model (`make train`)
+    python -m apex.models.train time-split  # train on older rows, test on newer (`make time-split`)
 
 Then `make mlflow-ui` to browse the runs.
 """
@@ -34,7 +35,10 @@ from apex.data.load import file_sha256, load_raw, raw_data_path
 from apex.data.split import load_splits
 from apex.models.evaluate import calibration_table, evaluate, plot_calibration, plot_test_report
 
-EXPERIMENT = "apex-lead-scoring"
+
+def experiment() -> str:
+    """MLflow experiment of the active dataset (`config → project.experiment`)."""
+    return load_config()["project"]["experiment"]
 
 
 def make_model(config: dict[str, Any] | None = None, **params: Any) -> Pipeline:
@@ -90,7 +94,7 @@ def run_baselines() -> pd.DataFrame:
     """Fit and log every baseline; print a comparison table on the validation split."""
     cfg = load_config()
     mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
-    mlflow.set_experiment(EXPERIMENT)
+    mlflow.set_experiment(experiment())
 
     parts = load_splits()
     target = cfg["data"]["target"]
@@ -100,7 +104,7 @@ def run_baselines() -> pd.DataFrame:
             for name, model in make_baselines(cfg).items()
         }
     ).T
-    print(f"Validation split ({len(parts['val']):,} leads)\n")
+    print(f"Validation split ({len(parts['val']):,} rows)\n")
     print(results.to_string())
     return results
 
@@ -109,7 +113,7 @@ def run_test() -> dict[str, float]:
     """Step 3.1: retrain on train + validation, score the test split once, log and plot."""
     cfg = load_config()
     mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
-    mlflow.set_experiment(EXPERIMENT)
+    mlflow.set_experiment(experiment())
 
     parts = load_splits(include_test=True)
     target = cfg["data"]["target"]
@@ -130,7 +134,7 @@ def run_test() -> dict[str, float]:
         mlflow.log_metrics({f"test_{k}": v for k, v in metrics.items()})
         mlflow.log_artifact(str(figure))
 
-    print(f"Fitted on train + validation ({len(fit):,} leads); test split ({len(test):,} leads)\n")
+    print(f"Fitted on train + validation ({len(fit):,} rows); test split ({len(test):,} rows)\n")
     print(pd.Series(metrics).to_string())
     print(f"\nfigure: {figure}")
     return metrics
@@ -144,7 +148,7 @@ def run_calibration() -> pd.DataFrame:
     """
     cfg = load_config()
     mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
-    mlflow.set_experiment(EXPERIMENT)
+    mlflow.set_experiment(experiment())
 
     parts = load_splits()
     target = cfg["data"]["target"]
@@ -171,7 +175,7 @@ def run_calibration() -> pd.DataFrame:
     figure.parent.mkdir(parents=True, exist_ok=True)
     plot_calibration(curves, figure, f"Calibration, out-of-fold ({len(X):,} leads)")
 
-    print(f"Out-of-fold predictions on train + validation ({len(X):,} leads)")
+    print(f"Out-of-fold predictions on train + validation ({len(X):,} rows)")
     print(f"actual conversion rate: {y.mean():.4f}\n")
     print(pd.DataFrame(rows).T.to_string())
     print("\nraw model, per bin:\n", curves["raw"].round(3).to_string())
@@ -237,44 +241,79 @@ def run_final() -> dict[str, Any]:
         },
         "explainer_means": dict(zip(model_inputs, explainer.means.round(6).tolist(), strict=True)),
     }
-    profile = build_profile(raw, model[0][:-1].transform(X), oof, segments, cfg)
-    card = build_card(meta, cfg)
+    documents = {
+        "model_meta": meta,
+        "reference_profile": build_profile(raw, model[0][:-1].transform(X), oof, segments, cfg),
+    }
+    if cfg["project"]["model_card"]:  # the card's text describes the lead product
+        documents["model_card"] = build_card(meta, cfg)
 
     out = path("models_dir")
     out.mkdir(parents=True, exist_ok=True)
     files = cfg["files"]
     joblib.dump(model, out / files["model"])
-    for key, content in [
-        ("model_meta", meta),
-        ("reference_profile", profile),
-        ("model_card", card),
-    ]:
+    for key, content in documents.items():
         with (out / files[key]).open("w", encoding="utf-8") as f:
             json.dump(content, f, indent=2, ensure_ascii=False)
             f.write("\n")
 
     mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
-    mlflow.set_experiment(EXPERIMENT)
+    mlflow.set_experiment(experiment())
     with mlflow.start_run(run_name=f"final_{meta['model_version']}"):
         mlflow.log_params({"model": "logistic_regression", "fit_rows": len(X), **_params(model)})
         mlflow.log_metrics({f"test_{k}": v for k, v in meta["performance"]["test"].items()})
         mlflow.log_metrics(
             {f"oof_{k}": v for k, v in meta["performance"]["out_of_fold_all"].items()}
         )
-        for key in ("model_meta", "reference_profile", "model_card"):
+        for key in documents:
             mlflow.log_artifact(str(out / files[key]))
 
-    print(f"Final model {meta['model_version']} fitted on all {len(X):,} leads")
+    print(f"Final model {meta['model_version']} fitted on all {len(X):,} rows")
     print(f"Thresholds: High ≥ {cutoffs['high']:.3f}, Medium ≥ {cutoffs['medium']:.3f}")
     print(f"Test PR-AUC {meta['performance']['test']['pr_auc']}, ", end="")
     print(f"out-of-fold PR-AUC {meta['performance']['out_of_fold_all']['pr_auc']}\n")
-    for key in ("model", "model_meta", "reference_profile", "model_card"):
+    for key in ("model", *documents):
         print(f"saved: {out / files[key]}")
     return meta
 
 
+def run_time_split() -> dict[str, float]:
+    """Train on the oldest rows, test on the newest: a check of how the model ages.
+
+    Only for files in date order (`config → split.time_ordered`, e.g. Bank Marketing).
+    The newest `test_size` share of rows is the test period. This is an extra check
+    next to the random split, not a model choice.
+    """
+    cfg = load_config()
+    if not cfg["split"].get("time_ordered"):
+        raise SystemExit("This dataset is not in date order (config → split.time_ordered).")
+    mlflow.set_tracking_uri(cfg["paths"]["mlflow_tracking_uri"])
+    mlflow.set_experiment(experiment())
+
+    target = cfg["data"]["target"]
+    raw = load_raw()  # file order = date order
+    cut = int(round(len(raw) * (1 - cfg["split"]["test_size"])))
+    older, newer = raw.iloc[:cut], raw.iloc[cut:]
+
+    model = make_model(cfg).fit(older.drop(columns=[target]), older[target])
+    metrics = evaluate(newer[target], model.predict_proba(newer.drop(columns=[target]))[:, 1])
+
+    with mlflow.start_run(run_name="time_split"):
+        mlflow.log_params({"model": "logistic_regression", "fit_rows": len(older)})
+        mlflow.log_params({"test_rows": len(newer)})
+        mlflow.log_metrics({f"time_{k}": v for k, v in metrics.items()})
+
+    print(
+        f"Fit on the oldest {len(older):,} rows (conversion {older[target].mean():.1%}); ", end=""
+    )
+    print(f"test on the newest {len(newer):,} (conversion {newer[target].mean():.1%})\n")
+    print(pd.Series(metrics).to_string())
+    return metrics
+
+
 if __name__ == "__main__":
     commands = {
+        "time-split": run_time_split,
         "baselines": run_baselines,
         "test": run_test,
         "calibration": run_calibration,

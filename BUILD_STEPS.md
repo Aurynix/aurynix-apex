@@ -259,8 +259,11 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 - [x] Bank ideas tested with CV on the train split: `age_group` instead of `age` (+0.013 PR-AUC) kept; "contacted before" flag and balance bands rejected (no gain beyond noise).
 - **Files:** `src/apex/data/features.py`, `src/apex/models/explain.py`, `src/apex/models/predict.py`, `src/apex/models/train.py`, `config.json`, `config_bank.json`, tests, `docs/bank_marketing.md`, `docs/features.md`, `reports/figures/bank/explain_importance.png`
 
-### B.4 Model, evaluation, segments
-- [ ] Split, baseline, CV, tuning (class weights at 11.7%), test evaluation, calibration, segments.
+### B.4 Model, evaluation, segments ✅
+- [x] MLflow experiment per dataset (`project.experiment`); model card optional (`project.model_card`, off for the bank); `make time-split` for date-ordered data (`split.time_ordered`).
+- [x] Split, baselines (val PR-AUC 0.376 vs. 0.117), tuning (`C = 1`, no class weights: `balanced` doubles the Brier score), test once (PR-AUC 0.359, top 20% recall 49%), calibration (raw ECE 0.005), segments (High 28.6% vs. Low 5.8%), final model in `models/bank/`.
+- [x] Time split: ranking holds (ROC-AUC 0.726 → 0.707), probabilities do not (ECE 0.163; conversion 6.7% → 31.6%).
+- **Files:** `src/apex/models/train.py`, `src/apex/models/cv.py`, `src/apex/models/segment.py`, `config.json`, `config_bank.json`, `Makefile`, `docs/bank_marketing.md`, `reports/figures/bank/`
 
 ### B.5 Report
 - [ ] Complete `docs/bank_marketing.md`; README section comparing both datasets.
@@ -302,3 +305,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-07 | B.1 | Bank Marketing data: UCI download (nested zip), `config_bank.json` with separate paths, loader handles `;`, yes/no target, missing id; same `clean()` through config only → 45,211 × 17, 0 nulls, 11.7% positive. |
 | 2026-10-07 | B.2 | Bank leakage audit: `duration` caught by the with/without check (+0.16 PR-AUC, biggest gain); also removed `campaign`, `day`, `month`, `contact` (not known before the call / time-period markers). Base 0.34 PR-AUC vs. 0.117 random. File is date-ordered (conversion 3% → 47%). |
 | 2026-10-07 | B.3 | Config-driven features and explanations (lead results identical). Bank: `age_group` replaces `age` (CV PR-AUC 0.344 → 0.356); top drivers: housing loan, previous campaigns (success → 65%), marital status, age. |
+| 2026-10-07 | B.4 | Bank model: test PR-AUC 0.359 (3.1× random), top 20% recall 49% / precision 29%, ECE 0.009; High 28.6% vs. Low 5.8%. Time split: ranking holds (ROC-AUC 0.707), probabilities do not (ECE 0.163). |
