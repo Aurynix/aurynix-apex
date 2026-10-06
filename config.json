@@ -129,7 +129,20 @@
     ],
     "presence_only": [
       "Specialization"
-    ]
+    ],
+    "ratios": {
+      "time_per_visit": [
+        "Total Time Spent on Website",
+        "TotalVisits"
+      ]
+    },
+    "flags": {
+      "has_web_activity": [
+        "TotalVisits",
+        0
+      ]
+    },
+    "bins": {}
   },
   "model": {
     "C": 1.0,
@@ -169,5 +182,22 @@
     "performance_drop_warning": 0.05,
     "performance_drop_drift": 0.1,
     "unseen_category_label": "__other__"
+  },
+  "explain": {
+    "labels": {
+      "Lead Origin": "Lead origin",
+      "Lead Source": "Lead source",
+      "Do Not Email": "Opted out of email",
+      "Specialization": "Specialization",
+      "What is your current occupation": "Occupation"
+    },
+    "groups": {
+      "Website activity": [
+        "Total Time Spent on Website",
+        "TotalVisits",
+        "time_per_visit",
+        "has_web_activity"
+      ]
+    }
   }
 }

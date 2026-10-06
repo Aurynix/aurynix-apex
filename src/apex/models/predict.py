@@ -19,7 +19,7 @@ from sklearn.pipeline import Pipeline
 
 from apex.config import load_config, path
 from apex.data.load import load_raw
-from apex.models.explain import LABELS, Explainer
+from apex.models.explain import Explainer, labels
 from apex.models.segment import assign
 
 
@@ -41,7 +41,7 @@ def explainer_from(model: Pipeline, meta: dict[str, Any]) -> Explainer:
 def predict(leads: pd.DataFrame, model: Pipeline, meta: dict[str, Any]) -> pd.DataFrame:
     """Probability, segment, and the strongest reason up / down for each lead."""
     scores = model.predict_proba(leads)[:, 1]
-    impact = explainer_from(model, meta).contributions(leads).rename(columns=LABELS)
+    impact = explainer_from(model, meta).contributions(leads).rename(columns=labels())
     return pd.DataFrame(
         {
             "probability": scores.round(4),

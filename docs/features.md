@@ -28,6 +28,14 @@ Because the whole path is one object, the API can pass a raw lead straight in, a
 
 ## New features
 
+All feature steps are configuration (`config.json → features`), built from small blocks that also serve the Bank Marketing data ([bank_marketing.md](bank_marketing.md) section 5): `presence_only` (→ Given / Missing), `ratios` (a / b), `flags` (column > value), `bins` (number → bands), `drop`. For the leads:
+
+```json
+"ratios": {"time_per_visit": ["Total Time Spent on Website", "TotalVisits"]},
+"flags":  {"has_web_activity": ["TotalVisits", 0]}
+```
+
+
 | Feature | Formula | Why (from [eda.md](eda.md)) |
 |---|---|---|
 | `time_per_visit` | time on site ÷ visits; 0 when there are no visits | Visit counts alone are flat (29%–43%), time is strong; this separates long, focused visits from quick ones |

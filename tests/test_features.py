@@ -72,3 +72,31 @@ def test_add_features_reduces_presence_only_columns():
         }
     )
     assert add_features(df)["Specialization"].tolist() == ["Given", "Missing"]
+
+
+def test_add_features_building_blocks_from_config():
+    """ratios, flags, bins, presence_only, drop: the bank-style and lead-style blocks."""
+    config = {
+        "features": {
+            "presence_only": ["spec"],
+            "ratios": {"per_visit": ["time", "visits"]},
+            "flags": {"contacted_before": ["pdays", -1]},
+            "bins": {"age": [25, 60]},
+            "drop": ["age"],
+        }
+    }
+    df = pd.DataFrame(
+        {
+            "spec": ["Finance", "Missing", "HR"],
+            "time": [100, 0, 30],
+            "visits": [4, 0, 3],
+            "pdays": [-1, 10, -1],
+            "age": [22, 40, 70],
+        }
+    )
+    out = add_features(df, config)
+    assert out["spec"].tolist() == ["Given", "Missing", "Given"]
+    assert out["per_visit"].tolist() == [25, 0, 10]
+    assert out["contacted_before"].tolist() == [0, 1, 0]
+    assert out["age_group"].tolist() == ["≤ 25", "25–60", "> 60"]
+    assert "age" not in out.columns
