@@ -65,7 +65,7 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 
 **Why.** Same accuracy, and simpler: one weight per feature that a sales rep can understand, probabilities that are close to calibrated without extra steps, fast training and serving. The data is small (5,544 training leads) and the main signals add up independently (Lead Add Form, occupation, time on site), which is what a linear model captures.
 
-**Consequences.** Model work focuses on Logistic Regression settings (regularization strength `C`, class weights) rather than comparing model families. Validation baseline: PR-AUC 0.840, 46.2% of buyers in the top 20% ([models.md](models.md)).
+**Consequences.** Model work focuses on Logistic Regression settings (regularization strength `C`, class weights) rather than comparing model families. Validation baseline: PR-AUC 0.840, 46.2% of buyers in the top 20% ([models.md](models.md)). LightGBM, XGBoost, and Optuna were later removed from the dependencies (unused); to rerun this comparison, add them for one run, e.g. `uv run --with lightgbm --with xgboost python ...`.
 
 ---
 

@@ -231,6 +231,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage.
 - [ ] Integration with Aurynix Pulse.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
+- [x] Remove unused dependencies (`xgboost`, `lightgbm`, `optuna`, `evidently`, `seaborn`, `pyarrow`, `python-multipart`; `shap` moved to dev): smaller installs and Docker image.
 
 ---
 
@@ -265,3 +266,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 4.5 | Docker (API + Streamlit demo, one image, `models/` mounted read-only, API health check, configurable ports) and `app/demo.py` (API client: score a lead, score a CSV, monitoring). Image 6.27 GB → 3.51 GB by keeping the uv cache out of it. Checked with the real stack in Docker. |
 | 2026-10-06 | 4.6 | Final documentation: README answers every design question with evidence; ADR-006 (API design), ADR-007 (monitoring); open questions closed. **v0.1.0 complete.** |
 | 2026-10-06 | 5 | CI/CD: GitHub Actions runs lint + 96 tests on every push / PR (no data or secrets needed), builds the Docker image on PRs, and pushes it to `ghcr.io/aurynix/aurynix-apex` on `main`. |
+| 2026-10-06 | 5 | Removed unused dependencies (xgboost, lightgbm, optuna, evidently, seaborn, pyarrow, python-multipart; shap → dev): Docker image 3.51 GB → 1.49 GB, local env 1.2 GB; every make target and the Docker stack re-checked. |
