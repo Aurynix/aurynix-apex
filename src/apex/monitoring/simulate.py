@@ -13,7 +13,18 @@ prediction log is never touched:
 
 Leads are scored by the real ScoringService (so they are logged like API traffic),
 then the Monitor checks them. Expected: stable → ok, drifted → drift.
+
+    python -m apex.monitoring.simulate outcomes   (or `make outcomes-demo`)
+
+Performance check with real results: leads sampled with their real `Converted`
+value are scored, and the true outcomes are sent back. Then "behavior changed":
+half of the outcomes are shuffled, so the score no longer matches who buys.
+Expected: real outcomes → ok, changed behavior → drift (retraining recommended).
+Note: the final model was trained on all of Leads.csv, so the first scenario is
+in-sample and slightly optimistic; it shows the mechanics, not new evidence.
 """
+
+import sys
 
 import numpy as np
 import pandas as pd
@@ -49,16 +60,20 @@ def drift(leads: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
     return leads
 
 
-def score_and_monitor(leads: pd.DataFrame) -> dict:
-    """Score the leads in a fresh simulation database and run the monitor on them."""
+def score_and_monitor(leads: pd.DataFrame, converted: pd.Series | None = None) -> dict:
+    """Score the leads in a fresh simulation database (optionally send their real
+    outcomes), then run the monitor on them."""
     db_file = path("raw_dir").parent / "simulation.db"
     db_file.unlink(missing_ok=True)
     db = connect(db_file)
 
     model, meta = load_model()
     rows = leads.astype(object).where(leads.notna(), None).to_dict(orient="records")
-    ScoringService(model, meta, db).score(rows)
-    return create_monitor(db).run(save=False)
+    service = ScoringService(model, meta, db)
+    ids = [p["prediction_id"] for p in service.score(rows)]
+    if converted is not None:
+        service.record_outcomes(dict(zip(ids, map(bool, converted), strict=True)))
+    return create_monitor(db, model, meta).run(save=False)
 
 
 def run(n: int = 2000) -> dict[str, dict]:
@@ -71,5 +86,24 @@ def run(n: int = 2000) -> dict[str, dict]:
     return reports
 
 
+def run_outcomes(n: int = 2000, seed: int = 0) -> dict[str, dict]:
+    """Real outcomes vs. changed behavior: the performance check."""
+    cfg = load_config()
+    sample = load_raw().sample(n, replace=True, random_state=seed).reset_index(drop=True)
+    leads, real = sample[cfg["serving"]["input_fields"]], sample[cfg["data"]["target"]]
+
+    changed = real.copy()
+    rng = np.random.default_rng(seed)
+    half = rng.random(n) < 0.5
+    changed[half] = rng.permutation(changed[half].to_numpy())
+
+    reports = {}
+    for name, converted in {"real outcomes": real, "behavior changed": changed}.items():
+        reports[name] = score_and_monitor(leads, converted)
+        print(f"===== {name} ({n:,} leads with outcomes) =====")
+        print(summary(reports[name]), "\n")
+    return reports
+
+
 if __name__ == "__main__":
-    run()
+    run_outcomes() if sys.argv[1:] == ["outcomes"] else run()

@@ -227,7 +227,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 
 ## Phase 5 — Later
 
-- [ ] `outcomes` table and live performance tracking (live PR-AUC, retraining trigger).
+- [x] `outcomes` table and live performance tracking: `prediction_id` in every prediction, `POST /outcomes`, performance check (real PR-AUC and High precision vs. test, `retrain_recommended`), `make outcomes-demo` (ADR-008).
 - [ ] Run the pipeline on the Bank Marketing dataset (UCI 222) and confirm `duration` is caught as leakage.
 - [ ] Integration with Aurynix Pulse.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
@@ -267,3 +267,4 @@ The step's checkbox and **Log** entry are updated in the same branch.
 | 2026-10-06 | 4.6 | Final documentation: README answers every design question with evidence; ADR-006 (API design), ADR-007 (monitoring); open questions closed. **v0.1.0 complete.** |
 | 2026-10-06 | 5 | CI/CD: GitHub Actions runs lint + 96 tests on every push / PR (no data or secrets needed), builds the Docker image on PRs, and pushes it to `ghcr.io/aurynix/aurynix-apex` on `main`. |
 | 2026-10-06 | 5 | Removed unused dependencies (xgboost, lightgbm, optuna, evidently, seaborn, pyarrow, python-multipart; shap → dev): Docker image 3.51 GB → 1.49 GB, local env 1.2 GB; every make target and the Docker stack re-checked. |
+| 2026-10-06 | 5 | Outcomes: `prediction_id` + `POST /outcomes` + performance check. Simulation: behavior change with unchanged inputs → drift checks green, real PR-AUC 0.787 → 0.571, High precision 83% → 64% → retraining recommended. 101 tests. |

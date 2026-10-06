@@ -270,7 +270,8 @@ make run     # → http://localhost:8000/docs
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
 | `POST` | `/predict/batch` | Score a list of leads (up to 10,000) |
-| `POST` | `/monitoring/run` | Run drift monitoring now |
+| `POST` | `/outcomes` | Send real results (converted or not) by `prediction_id` |
+| `POST` | `/monitoring/run` | Run monitoring now (drift, data quality, performance) |
 | `GET` | `/monitoring/latest` | Latest drift report |
 | `GET` | `/monitoring/history` | Status and score drift over time |
 
@@ -278,6 +279,7 @@ make run     # → http://localhost:8000/docs
 
 ```json
 {
+  "prediction_id": 1042,
   "score": 0.9568,
   "segment": "high",
   "reasons": {
@@ -292,7 +294,7 @@ make run     # → http://localhost:8000/docs
 }
 ```
 
-Every scored lead is logged to SQLite (`data/apex.db`, table `predictions`) for monitoring.
+Every scored lead is logged to SQLite (`data/apex.db`, table `predictions`) for monitoring. Later, send the real result with its `prediction_id` to `POST /outcomes`.
 
 ## Monitoring: Data Drift & Score Drift
 
@@ -310,13 +312,14 @@ Saved by `train.py` to `models/reference_profile.json`:
 
 Bin edges are fixed at training time and reused for all future comparisons.
 
-### Three checks
+### Four checks
 
 | Check | What it compares | Example signal |
 |---|---|---|
 | **Feature drift** | PSI of each model input (time on site, visits, occupation, lead origin, lead source, …) vs. training | a new source, much shorter visits |
 | **Prediction drift** | PSI of the score, and High / Medium / Low shares vs. training (20 / 30 / 50) | High 47% / Medium 38% / Low 15% |
 | **Data quality** | missing rate per field, unseen categories, leads relying on defaults, invalid requests rejected by the API | occupation missing 29% → 66% |
+| **Performance** | real PR-AUC and High-segment precision on outcomes sent to `POST /outcomes`, vs. the test results | PR-AUC 0.787 → 0.571 |
 
 | PSI | Status | Action |
 |---|---|---|
@@ -324,7 +327,7 @@ Bin edges are fixed at training time and reused for all future comparisons.
 | 0.10 – 0.25 | 🟡 warning | Investigate |
 | ≥ 0.25 | 🔴 drift | Find the cause; consider retraining |
 
-A minimum of **200 predictions** is required per run; otherwise the run is marked `insufficient_data`.
+Drift and data quality need **200 predictions** in the window, performance needs **200 outcomes** in the last 30 days; otherwise that part is `insufficient_data`. A performance drop of ≥ 0.10 (or score drift) sets `retrain_recommended`.
 
 ### Does it work? (`make drift-demo`)
 
@@ -336,6 +339,15 @@ A minimum of **200 predictions** is required per run; otherwise the run is marke
 | Lead Source / time on site / occupation PSI | 0.008 / 0.003 / 0.002 | **2.54 / 1.31 / 0.57** |
 | High / Medium / Low | 19% / 32% / 49% | **7% / 16% / 77%** |
 
+And with real results (`make outcomes-demo`): 2,000 leads with their true outcome, then the same leads after customer behavior changes (half the outcomes shuffled). The inputs look the same, so **drift checks see nothing**; only the outcomes do:
+
+| | Real outcomes | Behavior changed |
+|---|---|---|
+| Drift checks | 🟢 ok | 🟢 ok |
+| PR-AUC (expected 0.787) | 0.828 | **0.571** |
+| High precision (expected 83%) | 86% | **64%** |
+| Performance | 🟢 ok | 🔴 drift → **retraining recommended** |
+
 ### Storage (SQLite, `data/apex.db`)
 
 | Table | One row per | Key columns |
@@ -343,20 +355,19 @@ A minimum of **200 predictions** is required per run; otherwise the run is marke
 | `predictions` | Scored lead | created_at, model_version, lead (JSON), score, segment |
 | `rejected_requests` | Invalid request (422) | created_at, path, errors |
 | `drift_runs` | Monitoring run | created_at, n_samples, status, score_psi, full report (JSON) |
-| `outcomes` *(planned)* | Known result | prediction_id, converted, recorded_at |
+| `outcomes` | Real result of a scored lead | prediction_id, converted, recorded_at |
 
 ### Running it
 
 ```bash
-make monitor      # check the last 7 days of API predictions
-make drift-demo   # stable vs. drifted simulation
+make monitor        # check recent predictions (and outcomes)
+make drift-demo     # stable vs. drifted simulation
+make outcomes-demo  # real outcomes vs. changed behavior
 ```
 
-API: `POST /monitoring/run`, `GET /monitoring/latest`, `GET /monitoring/history`. The latest report is also saved to `reports/monitoring/latest.json`. Details: [docs/monitoring.md](docs/monitoring.md).
+API: `POST /outcomes` (send real results by `prediction_id`), `POST /monitoring/run`, `GET /monitoring/latest`, `GET /monitoring/history`. The latest report is also saved to `reports/monitoring/latest.json`. Details: [docs/monitoring.md](docs/monitoring.md).
 
-### Next step: real performance
-
-Drift shows that the **data** changed, not that the model is **wrong**. Once conversion outcomes arrive (from Aurynix Pulse), they are stored in `outcomes` and used to compute live PR-AUC and trigger retraining.
+Drift shows that the **data** changed; outcomes show whether the model is still **right**. Outcomes mostly arrive for leads that were called (often High), so performance can lean toward the model's own choices; see [ADR-008](docs/decisions.md).
 
 ## Tech Stack
 
@@ -519,6 +530,7 @@ Run `make help` for the full list.
 | | `make demo` | Start the Streamlit demo (API client) → http://localhost:8501 |
 | Monitoring | `make monitor` | Drift monitoring on the last 7 days of API predictions |
 | | `make drift-demo` | Simulate stable vs. drifted traffic; only the drift is flagged |
+| | `make outcomes-demo` | Send real outcomes, then changed behavior; the performance check recommends retraining |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
 | Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build the image / start API + demo / stop |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
@@ -560,7 +572,7 @@ Key settings: data paths, `target = "Converted"`, `random_state = 42`, segment c
 - [x] Final documentation
 
 ### Later
-- [ ] `outcomes` table and live performance tracking
+- [x] `outcomes` table and live performance tracking
 - [ ] Apply the pipeline to the Bank Marketing dataset
 - [ ] Integration with Aurynix Pulse
 
@@ -584,7 +596,7 @@ On a held-out test set used once (1,848 leads): calling the top 20% reaches **43
 Every lead gets a probability, a segment based on team capacity (top 20% High: call today; next 30% Medium: this week; rest Low: automated email), and its top reasons in plain words ("Occupation = Working Professional", "3 visits, 20 min on site"). If capacity changes, only the shares in `config.json` change. Probabilities are calibrated within 0.031 on average. ([Lead Segmentation](#lead-segmentation), [Explainability](#explainability), [ADR-005](docs/decisions.md))
 
 **How is the model monitored, and when is it retrained?**
-Every prediction is logged. `make monitor` (or `POST /monitoring/run`) checks feature drift, prediction drift (score PSI and segment shares), and data quality against the training profile. A simulated "new campaign" is flagged (Lead Source PSI 2.54, High share 20% → 7%) while stable traffic is not. Retrain when the score or a key feature reaches PSI ≥ 0.25, when new sources or forms appear, or when real outcomes show the High segment converting less. The model card lists the risks and their mitigations. ([monitoring.md](docs/monitoring.md), [ADR-007](docs/decisions.md), [model card](models/model_card.json))
+Every prediction is logged. `make monitor` (or `POST /monitoring/run`) checks feature drift, prediction drift (score PSI and segment shares), and data quality against the training profile. A simulated "new campaign" is flagged (Lead Source PSI 2.54, High share 20% → 7%) while stable traffic is not. Real results sent to `POST /outcomes` are compared with the test results: in a simulation where behavior changes but inputs don't, drift checks stay green while real PR-AUC falls from 0.787 to 0.571 and retraining is recommended. Retrain when performance drops by ≥ 0.10, when the score drifts (PSI ≥ 0.25), or when new sources or forms appear. The model card lists the risks and their mitigations. ([monitoring.md](docs/monitoring.md), [ADR-007](docs/decisions.md), [model card](models/model_card.json))
 
 ## Author
 

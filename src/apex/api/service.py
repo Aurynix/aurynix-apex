@@ -3,7 +3,10 @@
 Routers only validate the request, call the service, and return its result;
 they do not know how the model works. The service:
 
-    score → segment → explain → log prediction → response dict
+    score → segment → explain → log prediction → response dict (with prediction_id)
+
+Later, real results arrive by prediction_id (`record_outcomes`) and feed the
+performance check in monitoring.
 
 It is created once at startup from the saved artifacts (`make train`); the API
 never trains.
@@ -16,7 +19,7 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from apex.api.database import log_predictions
+from apex.api.database import log_predictions, record_outcomes
 from apex.models.explain import Explainer
 from apex.models.predict import explainer_from
 from apex.models.segment import assign
@@ -37,9 +40,10 @@ class ScoringService:
         segments = np.char.lower(assign(scores, self.meta["segments"]["thresholds"]))
         explanations = self.explainer.explain(leads)
 
-        log_predictions(self.db, rows, scores.tolist(), segments.tolist(), self.version)
+        ids = log_predictions(self.db, rows, scores.tolist(), segments.tolist(), self.version)
         return [
             {
+                "prediction_id": prediction_id,
                 "score": float(score),
                 "segment": str(segment),
                 "reasons": {
@@ -48,8 +52,14 @@ class ScoringService:
                 },
                 "model_version": self.version,
             }
-            for score, segment, reasons in zip(scores, segments, explanations, strict=True)
+            for prediction_id, score, segment, reasons in zip(
+                ids, scores, segments, explanations, strict=True
+            )
         ]
+
+    def record_outcomes(self, outcomes: dict[int, bool]) -> list[int]:
+        """Save real results {prediction_id: converted}; returns unknown ids (nothing saved)."""
+        return record_outcomes(self.db, outcomes)
 
     def info(self) -> dict[str, Any]:
         """What the API needs to say about the loaded model."""

@@ -10,7 +10,15 @@ Three checks on the leads scored in the last `window_days` (config.json → moni
    training, share of leads that relied on defaults, invalid requests rejected
    by the API.
 
-Fewer than `min_samples` predictions → status `insufficient_data`. Each run is
+And, when real results have been sent to POST /outcomes:
+
+4. Performance: real PR-AUC and real precision of the High segment on outcomes
+   recorded in the last `performance_window_days`, compared with the test
+   results saved with the model. A drop of `performance_drop_drift` or more
+   recommends retraining.
+
+Drift and data quality need `min_samples` predictions, performance needs
+`min_outcomes` outcomes; with neither, the status is `insufficient_data`. Each run is
 saved in SQLite (`drift_runs`) and as reports/monitoring/latest.json.
 
 Run `python -m apex.monitoring.monitor` (or `make monitor`).
@@ -28,10 +36,12 @@ from apex.api.database import (
     count_rejections,
     drift_runs,
     now,
+    read_outcomes,
     read_predictions,
     save_drift_run,
 )
 from apex.config import load_config, path
+from apex.models.evaluate import evaluate
 from apex.monitoring.drift import bin_shares, category_shares, psi, status, worst
 
 
@@ -42,9 +52,11 @@ class Monitor:
         profile: dict[str, Any],
         db: sqlite3.Connection,
         config: dict[str, Any] | None = None,
+        expected: dict[str, float] | None = None,
     ):
         self.model, self.profile, self.db = model, profile, db
         self.cfg = config or load_config()
+        self.expected = expected or {}  # test metrics saved with the model (model_meta.json)
 
     def run(self, window_days: int | None = None, save: bool = True) -> dict[str, Any]:
         """Check the last `window_days` of predictions; save and return the report."""
@@ -58,17 +70,22 @@ class Monitor:
             "n_samples": len(rows),
             "model_version": self.profile["model_version"],
         }
-        if len(rows) < mon["min_samples"]:
-            report["status"] = "insufficient_data"
-        else:
+        statuses = []
+        if len(rows) >= mon["min_samples"]:
             leads = pd.DataFrame([r[0] for r in rows], columns=self.cfg["serving"]["input_fields"])
             report["features"] = self.feature_drift(leads)
             report["prediction"] = self.prediction_drift([r[1] for r in rows], [r[2] for r in rows])
             report["data_quality"] = self.data_quality(leads, report["features"], since)
-            report["status"] = worst(
-                [f["status"] for f in report["features"].values()]
-                + [report["prediction"]["status"], report["data_quality"]["status"]]
-            )
+            statuses += [f["status"] for f in report["features"].values()]
+            statuses += [report["prediction"]["status"], report["data_quality"]["status"]]
+        report["performance"] = self.performance()
+        if report["performance"]["status"] != "insufficient_data":
+            statuses.append(report["performance"]["status"])
+        report["status"] = worst(statuses) if statuses else "insufficient_data"
+        report["retrain_recommended"] = "drift" in (
+            report["performance"]["status"],
+            report.get("prediction", {}).get("status"),
+        )
         if save:
             report["id"] = save_drift_run(self.db, report)
             out = path("monitoring_reports_dir")
@@ -153,6 +170,45 @@ class Monitor:
             "status": worst(statuses),
         }
 
+    def performance(self) -> dict[str, Any]:
+        """Real results vs. the test results: is the model still right?"""
+        mon = self.cfg["monitoring"]
+        days = mon["performance_window_days"]
+        since = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
+        rows = pd.DataFrame(
+            read_outcomes(self.db, since), columns=["score", "segment", "converted"]
+        )
+        result: dict[str, Any] = {"window_days": days, "n_outcomes": len(rows)}
+        if len(rows) < mon["min_outcomes"] or rows["converted"].nunique() < 2:
+            return {**result, "status": "insufficient_data"}
+
+        metrics = evaluate(rows["converted"], rows["score"])
+        by_segment = rows.groupby(rows["segment"].str.lower())["converted"].mean()
+        actual = {"pr_auc": metrics["pr_auc"], "precision_high": by_segment.get("high")}
+        expected = {
+            "pr_auc": self.expected.get("pr_auc"),
+            "precision_high": self.expected.get("precision_top20"),
+        }
+        statuses = []
+        for name, value in actual.items():
+            if value is None or expected[name] is None:
+                continue
+            drop = expected[name] - value
+            statuses.append(
+                "drift" if drop >= mon["performance_drop_drift"]
+                else "warning" if drop >= mon["performance_drop_warning"]
+                else "ok"
+            )  # fmt: skip
+        return {
+            **result,
+            "conversion_rate": round(float(rows["converted"].mean()), 4),
+            "actual": {k: None if v is None else round(float(v), 4) for k, v in actual.items()},
+            "expected": expected,
+            "recall_top20": metrics["recall_top20"],
+            "conversion_by_segment": {k: round(float(v), 4) for k, v in by_segment.items()},
+            "status": worst(statuses),
+        }
+
     def history(self, limit: int = 30) -> list[dict[str, Any]]:
         return drift_runs(self.db, limit)
 
@@ -161,6 +217,21 @@ def summary(report: dict[str, Any]) -> str:
     """A short text version of a report, for the terminal."""
     lines = [f"Status: {report['status'].upper()}  ({report['n_samples']:,} predictions, "
              f"last {report['window_days']} days)"]  # fmt: skip
+    if report.get("retrain_recommended"):
+        lines.append("→ Retraining recommended")
+    perf = report.get("performance", {})
+    if perf.get("status", "insufficient_data") != "insufficient_data":
+        act, exp = perf["actual"], perf["expected"]
+        lines += [
+            "",
+            f"Performance: {perf['status']}  ({perf['n_outcomes']:,} outcomes, "
+            f"last {perf['window_days']} days, conversion {perf['conversion_rate']:.0%})",
+            f"  PR-AUC          now {act['pr_auc']:.3f}   expected {exp['pr_auc'] or 0:.3f}",
+            f"  High precision  now {act['precision_high'] or 0:.0%}    "
+            f"expected {exp['precision_high'] or 0:.0%}",
+        ]
+    elif perf:
+        lines.append(f"Performance: not enough outcomes yet ({perf['n_outcomes']:,})")
     if "features" not in report:
         return "\n".join(lines)
     pred, dq = report["prediction"], report["data_quality"]
@@ -188,16 +259,22 @@ def summary(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def create_monitor(db: sqlite3.Connection | None = None, model: Pipeline | None = None) -> Monitor:
+def create_monitor(
+    db: sqlite3.Connection | None = None,
+    model: Pipeline | None = None,
+    meta: dict[str, Any] | None = None,
+) -> Monitor:
     """Monitor for the saved model, its reference profile, and the API database."""
     from apex.api.database import connect
     from apex.models.predict import load_model
 
     cfg = load_config()
-    model = model or load_model()[0]
+    if model is None or meta is None:
+        model, meta = load_model()
     with (path("models_dir") / cfg["files"]["reference_profile"]).open(encoding="utf-8") as f:
         profile = json.load(f)
-    return Monitor(model, profile, db or connect(path("database")), cfg)
+    expected = meta["performance"]["test"]
+    return Monitor(model, profile, db or connect(path("database")), cfg, expected)
 
 
 if __name__ == "__main__":

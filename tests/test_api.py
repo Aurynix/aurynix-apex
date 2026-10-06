@@ -41,7 +41,7 @@ def test_predict_single_matches_contract_and_is_logged(client, service):
     response = client.post("/predict/single", json=LEAD)
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"score", "segment", "reasons", "model_version"}
+    assert set(body) == {"prediction_id", "score", "segment", "reasons", "model_version"}
     assert 0 <= body["score"] <= 1
     assert body["segment"] in {"high", "medium", "low"}
     assert set(body["reasons"]) == {"up", "down"}
@@ -101,3 +101,29 @@ def test_monitoring_endpoints(client):
     assert report["status"] == "insufficient_data"  # 10 < 50
     assert client.get("/monitoring/latest").json()["id"] == report["id"]
     assert client.get("/monitoring/history").json()[0]["status"] == "insufficient_data"
+
+
+def test_outcomes_are_saved_by_prediction_id(client, service):
+    first, second = client.post("/predict/batch", json={"leads": [LEAD, LEAD]}).json()[
+        "predictions"
+    ]
+    assert second["prediction_id"] == first["prediction_id"] + 1
+    payload = {"outcomes": [{"prediction_id": first["prediction_id"], "converted": True}]}
+    assert client.post("/outcomes", json=payload).json() == {"saved": 1}
+    payload["outcomes"][0]["converted"] = False  # sending again replaces the outcome
+    client.post("/outcomes", json=payload)
+    assert service.db.execute("SELECT converted FROM outcomes").fetchall() == [(0,)]
+
+
+def test_unknown_prediction_ids_save_nothing(client, service):
+    pid = client.post("/predict/single", json=LEAD).json()["prediction_id"]
+    payload = {
+        "outcomes": [
+            {"prediction_id": pid, "converted": True},
+            {"prediction_id": 999, "converted": True},
+        ]
+    }
+    response = client.post("/outcomes", json=payload)
+    assert response.status_code == 404
+    assert response.json()["detail"]["unknown"] == [999]
+    assert service.db.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 0

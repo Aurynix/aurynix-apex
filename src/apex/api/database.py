@@ -4,6 +4,7 @@ Tables:
 - `predictions`: every scored lead (input fields, score, segment)
 - `rejected_requests`: requests the API refused as invalid (422), for data quality
 - `drift_runs`: one row per monitoring run, with the full report as JSON
+- `outcomes`: the real result of a scored lead (converted or not), sent later
 """
 
 import json
@@ -26,6 +27,11 @@ CREATE TABLE IF NOT EXISTS rejected_requests (
     created_at TEXT NOT NULL,
     path       TEXT NOT NULL,
     errors     TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS outcomes (
+    prediction_id INTEGER PRIMARY KEY REFERENCES predictions(id),
+    converted     INTEGER NOT NULL CHECK (converted IN (0, 1)),
+    recorded_at   TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS drift_runs (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,18 +66,52 @@ def log_predictions(
     scores: list[float],
     segments: list[str],
     version: str,
-) -> None:
-    """Save one row per scored lead: the input fields, the score, and the segment."""
+) -> list[int]:
+    """Save one row per scored lead (input fields, score, segment); return their ids."""
     created = now()
+    ids = [
+        conn.execute(
+            "INSERT INTO predictions (created_at, model_version, lead, score, segment) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (created, version, json.dumps(row), score, segment),
+        ).lastrowid
+        for row, score, segment in zip(rows, scores, segments, strict=True)
+    ]
+    conn.commit()
+    return ids
+
+
+def record_outcomes(conn: sqlite3.Connection, outcomes: dict[int, bool]) -> list[int]:
+    """Save {prediction_id: converted}. Returns unknown ids; if any, nothing is saved.
+
+    Sending an outcome again for the same prediction replaces the earlier one.
+    """
+    ids = list(outcomes)
+    marks = ",".join("?" * len(ids))
+    known = {
+        row[0] for row in conn.execute(f"SELECT id FROM predictions WHERE id IN ({marks})", ids)
+    }
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        return unknown
+    recorded = now()
     conn.executemany(
-        "INSERT INTO predictions (created_at, model_version, lead, score, segment) "
-        "VALUES (?, ?, ?, ?, ?)",
-        [
-            (created, version, json.dumps(row), score, segment)
-            for row, score, segment in zip(rows, scores, segments, strict=True)
-        ],
+        "INSERT INTO outcomes (prediction_id, converted, recorded_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(prediction_id) DO UPDATE SET "
+        "converted = excluded.converted, recorded_at = excluded.recorded_at",
+        [(i, int(converted), recorded) for i, converted in outcomes.items()],
     )
     conn.commit()
+    return []
+
+
+def read_outcomes(conn: sqlite3.Connection, since: str) -> list[tuple[float, str, int]]:
+    """(score, segment, converted) for outcomes recorded at or after `since`."""
+    return conn.execute(
+        "SELECT p.score, p.segment, o.converted FROM outcomes o "
+        "JOIN predictions p ON p.id = o.prediction_id WHERE o.recorded_at >= ?",
+        (since,),
+    ).fetchall()
 
 
 def log_rejection(conn: sqlite3.Connection, path: str, errors: list[dict]) -> None:

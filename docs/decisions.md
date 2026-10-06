@@ -11,6 +11,7 @@ Short records of decisions that shape the model and the system. Newest last.
 | [005](#adr-005-no-extra-calibration-keep-raw-logistic-regression-probabilities) | No extra calibration | 3.2 |
 | [006](#adr-006-api-thin-routers-one-scoring-service-no-training-in-the-api) | API: thin routers, one scoring service, no training in the API | 4.1 |
 | [007](#adr-007-drift-monitoring-with-own-psi-code-and-three-checks) | Drift monitoring with own PSI code and three checks | 4.4 |
+| [008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check) | Real outcomes by prediction id and a performance check | 5 |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -132,5 +133,21 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 
 **Why.** PSI is simple, explainable, and enough for these inputs. Own code avoids a large dependency and keeps the numbers in the API and the demo. Evidence: the simulation flags a "new campaign" shift (Lead Source PSI 2.54, High share 20% → 7%) and does not flag stable traffic (all PSI ≤ 0.02) ([monitoring.md](monitoring.md)).
 
-**Consequences.** Drift says the data changed, not that the model is wrong. When outcomes arrive, add an `outcomes` table and track live precision of the High segment.
+**Consequences.** Drift says the data changed, not that the model is wrong. Real outcomes were added later ([ADR-008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check)).
+
+---
+
+## ADR-008: Real outcomes by prediction id and a performance check
+
+- **Date:** 2026-10-06 · **Step:** Phase 5 · **Status:** Accepted
+
+**Context.** Drift monitoring can't tell whether the model is still right: customer behavior can change while the inputs look the same. That needs the real result of scored leads.
+
+**Decision.**
+- Every prediction returns a `prediction_id`. Clients (e.g. Aurynix Pulse) send `POST /outcomes` with `{prediction_id, converted}` when the result is known; resending replaces it; unknown ids save nothing (404).
+- The monitor adds a 4th check: real PR-AUC and real High-segment precision on outcomes recorded in the last 30 days (at least 200), against the test results stored in `model_meta.json`. A drop ≥ 0.05 is a warning, ≥ 0.10 is drift and sets `retrain_recommended`.
+
+**Why.** It closes the loop with the smallest change: one table, one endpoint, one check, using the prediction log that already exists. Evidence: in a simulation where behavior changes but inputs do not, all drift checks stay green, while PR-AUC falls from 0.787 to 0.571 and retraining is recommended ([monitoring.md](monitoring.md)).
+
+**Consequences.** Outcomes mostly come from leads that were called, which are mostly High, so measured performance leans toward the model's own choices (feedback loop). Recommended, not built: call a small random sample of Medium / Low leads too. Retraining itself stays manual (`make train`, ADR-006).
 
