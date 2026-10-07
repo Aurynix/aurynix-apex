@@ -310,3 +310,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-07 | B.5 | Phase 6 report: bank summary and comparison with leads, README "Second Dataset", ADR-009. Phase 6 complete. |
 | 2026-10-07 | — | Release v0.2.0: version bump (software only; model stays `apex-v0.1.0`), `CHANGELOG.md`, CI publishes the image on version tags. |
 | 2026-10-07 | 5 | Safe retraining (`make retrain`, ADR-010): leads and bank both keep their current model on today's data (0.790 vs. 0.787; 0.362 vs. 0.359); promotion covered by tests. |
+| 2026-10-07 | — | Load test found HTTP 500s on parallel requests (shared SQLite connection); fixed with a lock. Server sizing measured: API 240 MB peak, training 380 MB → 1 GB minimum, 2 GB comfortable. |

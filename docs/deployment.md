@@ -83,3 +83,27 @@ docker run -p 8000:8000 -v ./models:/app/models:ro -v ./data:/app/data ghcr.io/a
 
 The repository is private, so the image is private too: `docker login ghcr.io` with a GitHub token that has `read:packages` first.
 
+## Server sizing
+
+Measured on the Docker stack (`make docker-up`, model trained on the lead data) with a load test: three batches of 10,000 leads, 1,000 single predictions sent 20 at a time, a monitoring run, and a demo session.
+
+| | Memory | Notes |
+|---|---|---|
+| API at rest | 140 MB | model + explainer loaded once |
+| API under load (peak) | **240 MB** | batch of 10,000 leads: 2.6 s; single predictions: ~20 per second per worker |
+| Demo (Streamlit) | 50 MB | a client of the API; optional |
+| Training (`make train` / `make retrain`) | **360–380 MB** peak | 4–6 s (leads 9,240 rows; bank 45,211 rows) |
+| Monitoring run | within the API | 0.4 s on ~42,000 logged predictions |
+| Docker image | 1.49 GB disk | no model inside |
+
+**Recommendation:**
+
+| Setup | RAM | CPU | Disk |
+|---|---|---|---|
+| Minimum (API + demo, training on the same server) | **1 GB** | 1 vCPU | 10 GB |
+| Comfortable (room for OS, Docker, updates, a second API worker) | **2 GB** | 2 vCPU | 20 GB |
+
+- Each extra API worker (`make run-prod` uses 2) adds about 240 MB.
+- Disk grows with the prediction log (`data/apex.db`): about 0.3 MB per 1,000 predictions.
+- One worker handles about 20 single predictions per second, or thousands per second in batches, far above a typical lead volume.
+
