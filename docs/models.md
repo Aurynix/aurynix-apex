@@ -357,3 +357,30 @@ The test split has done its job (step 3.1), so the **final model is fitted on al
 | Indirect bias through occupation | Medium | Low | Low |
 
 Each risk's mitigation is in the card.
+
+## Retraining safely
+
+```bash
+make retrain   # new model vs. current model; replace only if at least as good
+```
+
+[`retrain.py`](../src/apex/models/retrain.py) compares the **current model** (champion) with a **new model trained on the current data** (challenger), on the same held-out leads:
+
+| Held-out leads | When | Why |
+|---|---|---|
+| **Real outcomes** (`POST /outcomes`) | at least 200 (`monitoring.min_outcomes`) | Production leads that neither model was trained on: the fairest test |
+| 20% of the data file (stratified) | otherwise (`retrain.holdout_share`) | Kept out of the challenger's training. The champion may have seen them, which favors it: replacing is made harder, never easier |
+
+- **Promote** if challenger PR-AUC ≥ champion PR-AUC + `retrain.min_gain` (default 0): the current artifacts are copied to `models/archive/<trained_at>/`, then the final model is refitted on all data (as `make train`).
+- **Keep** otherwise: nothing changes.
+- Both scores and the decision are logged to MLflow (`retrain` run). Restart the API to serve a new model.
+
+On today's data both datasets keep their current model (nothing new to learn):
+
+| Dataset | Held-out | Champion PR-AUC | Challenger PR-AUC | Decision |
+|---|---|---|---|---|
+| Leads | 1,848 rows | 0.790 | 0.787 | kept |
+| Bank Marketing | 9,043 rows | 0.362 | 0.359 | kept |
+
+When the behavior of leads changes (see the outcomes simulation in [monitoring.md](monitoring.md)), the challenger wins and is promoted; this is covered by `tests/test_retrain.py`. ([ADR-010](decisions.md))
+

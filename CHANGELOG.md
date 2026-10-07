@@ -2,6 +2,11 @@
 
 Software versions of Aurynix Apex. The **model version** (`apex-v0.1.0`, in `config.json`) is separate: it changes only when the model itself changes (new data or new settings).
 
+## Unreleased
+
+**Added**
+- **Safe retraining** (`make retrain`): a new model replaces the saved one only if its PR-AUC is at least as good on the same held-out leads (real outcomes when available, otherwise a 20% holdout); the old model is archived in `models/archive/` ([ADR-010](docs/decisions.md)).
+
 ## v0.2.0 (2026-10-07)
 
 **Added**
