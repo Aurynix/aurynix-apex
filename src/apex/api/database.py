@@ -7,8 +7,10 @@ Tables:
 - `outcomes`: the real result of a scored lead (converted or not), sent later
 """
 
+import functools
 import json
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -44,10 +46,27 @@ CREATE TABLE IF NOT EXISTS drift_runs (
 """
 
 
+# The API handles requests in parallel threads that share one connection. SQLite
+# allows that only if calls take turns, so every function below holds this lock.
+_lock = threading.RLock()
+
+
+def locked(func):
+    """Run `func` while holding the database lock."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with _lock:
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
 def now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+@locked
 def init_db(conn: sqlite3.Connection) -> sqlite3.Connection:
     """Create the tables if they do not exist yet."""
     conn.executescript(SCHEMA)
@@ -60,6 +79,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return init_db(sqlite3.connect(db_path, check_same_thread=False))
 
 
+@locked
 def log_predictions(
     conn: sqlite3.Connection,
     rows: list[dict],
@@ -81,6 +101,7 @@ def log_predictions(
     return ids
 
 
+@locked
 def record_outcomes(conn: sqlite3.Connection, outcomes: dict[int, bool]) -> list[int]:
     """Save {prediction_id: converted}. Returns unknown ids; if any, nothing is saved.
 
@@ -105,6 +126,7 @@ def record_outcomes(conn: sqlite3.Connection, outcomes: dict[int, bool]) -> list
     return []
 
 
+@locked
 def read_outcome_leads(conn: sqlite3.Connection) -> list[tuple[dict, int]]:
     """(lead fields, converted) for every lead with a known outcome (for retraining checks)."""
     rows = conn.execute(
@@ -113,6 +135,7 @@ def read_outcome_leads(conn: sqlite3.Connection) -> list[tuple[dict, int]]:
     return [(json.loads(lead), converted) for lead, converted in rows]
 
 
+@locked
 def read_outcomes(conn: sqlite3.Connection, since: str) -> list[tuple[float, str, int]]:
     """(score, segment, converted) for outcomes recorded at or after `since`."""
     return conn.execute(
@@ -122,6 +145,7 @@ def read_outcomes(conn: sqlite3.Connection, since: str) -> list[tuple[float, str
     ).fetchall()
 
 
+@locked
 def log_rejection(conn: sqlite3.Connection, path: str, errors: list[dict]) -> None:
     """Save a request the API refused as invalid."""
     conn.execute(
@@ -131,6 +155,7 @@ def log_rejection(conn: sqlite3.Connection, path: str, errors: list[dict]) -> No
     conn.commit()
 
 
+@locked
 def read_predictions(conn: sqlite3.Connection, since: str) -> list[tuple[dict, float, str]]:
     """(lead, score, segment) for every prediction logged at or after `since`."""
     rows = conn.execute(
@@ -139,12 +164,14 @@ def read_predictions(conn: sqlite3.Connection, since: str) -> list[tuple[dict, f
     return [(json.loads(lead), score, segment) for lead, score, segment in rows]
 
 
+@locked
 def count_rejections(conn: sqlite3.Connection, since: str) -> int:
     return conn.execute(
         "SELECT COUNT(*) FROM rejected_requests WHERE created_at >= ?", (since,)
     ).fetchone()[0]
 
 
+@locked
 def save_drift_run(conn: sqlite3.Connection, report: dict[str, Any]) -> int:
     """Store a monitoring report; returns its id."""
     cursor = conn.execute(
@@ -162,6 +189,7 @@ def save_drift_run(conn: sqlite3.Connection, report: dict[str, Any]) -> int:
     return cursor.lastrowid
 
 
+@locked
 def drift_runs(conn: sqlite3.Connection, limit: int = 30) -> list[dict[str, Any]]:
     """Latest monitoring reports, newest first."""
     rows = conn.execute(

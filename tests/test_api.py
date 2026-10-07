@@ -133,3 +133,19 @@ def test_api_reports_the_software_version(client):
     from importlib.metadata import version
 
     assert client.get("/openapi.json").json()["info"]["version"] == version("aurynix-apex")
+
+
+def test_parallel_scoring_shares_one_database_connection_safely(trained, tmp_path):
+    """The API scores requests in parallel threads that share one SQLite connection."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from apex.api.database import connect
+    from apex.api.service import ScoringService
+
+    model, meta, _ = trained
+    service = ScoringService(model, meta, connect(tmp_path / "apex.db"))
+    row = Lead(**LEAD).to_row()
+    with ThreadPoolExecutor(20) as pool:
+        results = list(pool.map(lambda _: service.score([row])[0]["prediction_id"], range(100)))
+    assert len(set(results)) == 100
+    assert service.db.execute("SELECT COUNT(*) FROM predictions").fetchone()[0] == 100
