@@ -127,3 +127,9 @@ def test_unknown_prediction_ids_save_nothing(client, service):
     assert response.status_code == 404
     assert response.json()["detail"]["unknown"] == [999]
     assert service.db.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 0
+
+
+def test_api_reports_the_software_version(client):
+    from importlib.metadata import version
+
+    assert client.get("/openapi.json").json()["info"]["version"] == version("aurynix-apex")

@@ -2,7 +2,7 @@
 
 > Surface the apex of your pipeline: predict which leads will convert, so sales teams call the right people first.
 
-![Status](https://img.shields.io/badge/status-v0.1.0%20complete-brightgreen)
+![Release](https://img.shields.io/badge/release-v0.2.0-brightgreen)
 [![CI/CD](https://github.com/Aurynix/aurynix-apex/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Aurynix/aurynix-apex/actions/workflows/ci-cd.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
@@ -17,7 +17,7 @@
 
 It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-pulse)**, an AI lead qualification platform.
 
-> ✅ **v0.1.0 complete.** All build steps are done ([BUILD_STEPS.md](BUILD_STEPS.md)). On a held-out test set, the top 20% of scored leads hold **43%** of all buyers, and **83%** of calls in that group reach a buyer (random: 38%). See [Results](#results).
+> ✅ **v0.2.0.** All build steps are done ([BUILD_STEPS.md](BUILD_STEPS.md)); changes per version in [CHANGELOG.md](CHANGELOG.md). On a held-out test set, the top 20% of scored leads hold **43%** of all buyers, and **83%** of calls in that group reach a buyer (random: 38%). See [Results](#results).
 
 ---
 
@@ -483,6 +483,7 @@ aurynix-apex/
 ├── .dockerignore
 ├── docker-compose.yml
 ├── BUILD_STEPS.md                 # step-by-step build plan
+├── CHANGELOG.md                   # changes per software version
 ├── LICENSE
 └── README.md
 ```

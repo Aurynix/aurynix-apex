@@ -307,3 +307,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-07 | B.3 | Config-driven features and explanations (lead results identical). Bank: `age_group` replaces `age` (CV PR-AUC 0.344 → 0.356); top drivers: housing loan, previous campaigns (success → 65%), marital status, age. |
 | 2026-10-07 | B.4 | Bank model: test PR-AUC 0.359 (3.1× random), top 20% recall 49% / precision 29%, ECE 0.009; High 28.6% vs. Low 5.8%. Time split: ranking holds (ROC-AUC 0.707), probabilities do not (ECE 0.163). |
 | 2026-10-07 | B.5 | Phase 6 report: bank summary and comparison with leads, README "Second Dataset", ADR-009. Phase 6 complete. |
+| 2026-10-07 | — | Release v0.2.0: version bump (software only; model stays `apex-v0.1.0`), `CHANGELOG.md`, CI publishes the image on version tags. |

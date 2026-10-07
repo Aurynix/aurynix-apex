@@ -9,6 +9,7 @@ it never trains.
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import version
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -36,7 +37,7 @@ def create_app(service: ScoringService | None = None, monitor: Monitor | None = 
     app = FastAPI(
         title="Aurynix Apex",
         description="Lead scoring: probability, priority segment, and reasons for each new lead.",
-        version="0.1.0",
+        version=version("aurynix-apex"),  # software version, from pyproject.toml
         lifespan=lifespan,
     )
 
