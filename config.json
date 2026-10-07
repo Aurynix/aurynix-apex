@@ -202,5 +202,9 @@
         "has_web_activity"
       ]
     }
+  },
+  "retrain": {
+    "holdout_share": 0.2,
+    "min_gain": 0.0
   }
 }

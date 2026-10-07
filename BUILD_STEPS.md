@@ -232,6 +232,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [ ] Integration with Aurynix Pulse.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
 - [x] Remove unused dependencies (`xgboost`, `lightgbm`, `optuna`, `evidently`, `seaborn`, `pyarrow`, `python-multipart`; `shap` moved to dev): smaller installs and Docker image.
+- [x] Safe retraining (`make retrain`): champion vs. challenger on real outcomes or a holdout; promote only if at least as good; archive the old model (ADR-010).
 
 ---
 
@@ -308,3 +309,4 @@ Run the same pipeline on UCI Bank Marketing (id 222) to show what is general, an
 | 2026-10-07 | B.4 | Bank model: test PR-AUC 0.359 (3.1× random), top 20% recall 49% / precision 29%, ECE 0.009; High 28.6% vs. Low 5.8%. Time split: ranking holds (ROC-AUC 0.707), probabilities do not (ECE 0.163). |
 | 2026-10-07 | B.5 | Phase 6 report: bank summary and comparison with leads, README "Second Dataset", ADR-009. Phase 6 complete. |
 | 2026-10-07 | — | Release v0.2.0: version bump (software only; model stays `apex-v0.1.0`), `CHANGELOG.md`, CI publishes the image on version tags. |
+| 2026-10-07 | 5 | Safe retraining (`make retrain`, ADR-010): leads and bank both keep their current model on today's data (0.790 vs. 0.787; 0.362 vs. 0.359); promotion covered by tests. |

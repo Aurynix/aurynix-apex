@@ -443,6 +443,7 @@ aurynix-apex/
 │       │   └── split.py
 │       ├── models/
 │       │   ├── train.py           # baselines, test, calibration, final model
+│       │   ├── retrain.py         # safe retraining: champion vs. challenger
 │       │   ├── cv.py              # cross-validation & tuning
 │       │   ├── evaluate.py        # metrics & charts
 │       │   ├── segment.py         # High / Medium / Low
@@ -548,6 +549,7 @@ Run `make help` for the full list.
 | | `make features` | Fit the feature pipeline and list the features |
 | | `make split` | Create the fixed train / validation / test split |
 | | `make baselines` | Fit no-skill + Logistic Regression, log to MLflow |
+| | `make retrain` | New model vs. current: replace only if at least as good (old one archived) |
 | | `make train` | Fit the final model on all leads; save model, meta, reference profile, model card |
 | | `make cv` | 5-fold CV: all vs. selected features, logged to MLflow |
 | | `make tune` | Grid search over `C` and class weights, logged to MLflow |
@@ -633,7 +635,7 @@ On a held-out test set used once (1,848 leads): calling the top 20% reaches **43
 Every lead gets a probability, a segment based on team capacity (top 20% High: call today; next 30% Medium: this week; rest Low: automated email), and its top reasons in plain words ("Occupation = Working Professional", "3 visits, 20 min on site"). If capacity changes, only the shares in `config.json` change. Probabilities are calibrated within 0.031 on average. ([Lead Segmentation](#lead-segmentation), [Explainability](#explainability), [ADR-005](docs/decisions.md))
 
 **How is the model monitored, and when is it retrained?**
-Every prediction is logged. `make monitor` (or `POST /monitoring/run`) checks feature drift, prediction drift (score PSI and segment shares), and data quality against the training profile. A simulated "new campaign" is flagged (Lead Source PSI 2.54, High share 20% → 7%) while stable traffic is not. Real results sent to `POST /outcomes` are compared with the test results: in a simulation where behavior changes but inputs don't, drift checks stay green while real PR-AUC falls from 0.787 to 0.571 and retraining is recommended. Retrain when performance drops by ≥ 0.10, when the score drifts (PSI ≥ 0.25), or when new sources or forms appear. The model card lists the risks and their mitigations. ([monitoring.md](docs/monitoring.md), [ADR-007](docs/decisions.md), [model card](models/model_card.json))
+Every prediction is logged. `make monitor` (or `POST /monitoring/run`) checks feature drift, prediction drift (score PSI and segment shares), and data quality against the training profile. A simulated "new campaign" is flagged (Lead Source PSI 2.54, High share 20% → 7%) while stable traffic is not. Real results sent to `POST /outcomes` are compared with the test results: in a simulation where behavior changes but inputs don't, drift checks stay green while real PR-AUC falls from 0.787 to 0.571 and retraining is recommended. Retrain when performance drops by ≥ 0.10, when the score drifts (PSI ≥ 0.25), or when new sources or forms appear; `make retrain` replaces the model only if the new one is at least as good, and archives the old one ([ADR-010](docs/decisions.md)). The model card lists the risks and their mitigations. ([monitoring.md](docs/monitoring.md), [ADR-007](docs/decisions.md), [model card](models/model_card.json))
 
 ## Author
 

@@ -105,6 +105,14 @@ def record_outcomes(conn: sqlite3.Connection, outcomes: dict[int, bool]) -> list
     return []
 
 
+def read_outcome_leads(conn: sqlite3.Connection) -> list[tuple[dict, int]]:
+    """(lead fields, converted) for every lead with a known outcome (for retraining checks)."""
+    rows = conn.execute(
+        "SELECT p.lead, o.converted FROM outcomes o JOIN predictions p ON p.id = o.prediction_id"
+    ).fetchall()
+    return [(json.loads(lead), converted) for lead, converted in rows]
+
+
 def read_outcomes(conn: sqlite3.Connection, since: str) -> list[tuple[float, str, int]]:
     """(score, segment, converted) for outcomes recorded at or after `since`."""
     return conn.execute(

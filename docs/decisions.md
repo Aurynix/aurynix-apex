@@ -13,6 +13,7 @@ Short records of decisions that shape the model and the system. Newest last.
 | [007](#adr-007-drift-monitoring-with-own-psi-code-and-three-checks) | Drift monitoring with own PSI code and three checks | 4.4 |
 | [008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check) | Real outcomes by prediction id and a performance check | 5 |
 | [009](#adr-009-one-pipeline-one-config-per-dataset) | One pipeline, one config per dataset | 6 |
+| [010](#adr-010-safe-retraining-champion-vs-challenger) | Safe retraining: champion vs. challenger | — |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -165,4 +166,18 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 **Why.** The bank data ran end to end with no new cleaning, modelling, evaluation, or segmentation code, and the lead model gave identical results after each change (test PR-AUC 0.7874). Small, named building blocks keep the config readable; anything that needs real logic stays in code.
 
 **Consequences.** A new dataset = a new config + a leakage audit + feature choices; the audit and the choices stay human decisions. The API, demo, monitoring, and model card text still describe the lead product; serving a second dataset would need its own API schema (not built).
+
+---
+
+## ADR-010: Safe retraining: champion vs. challenger
+
+- **Date:** 2026-10-07 · **Status:** Accepted
+
+**Context.** Monitoring says *when* to retrain (`retrain_recommended`), and `make train` overwrites the model unconditionally. A retrain on bad or unusual data could silently make the model worse.
+
+**Decision.** `make retrain` trains a challenger on the current data and compares it with the saved champion on the same held-out leads: real outcomes when there are at least 200, otherwise a stratified 20% of the data file kept out of the challenger's training. The challenger replaces the champion only if its PR-AUC is at least the champion's (+ `retrain.min_gain`). The old artifacts are archived in `models/archive/<trained_at>/`.
+
+**Why.** One command, one rule, a rollback path. Real outcomes are the fairest test (neither model saw them). The file holdout favors the champion when it was trained on those rows, which errs on the side of keeping a working model.
+
+**Consequences.** Retraining stays a manual, deliberate step (ADR-006): no automatic schedule, no API endpoint. Restart the API to serve a promoted model. Rolling back = copying an archive folder back into `models/`.
 

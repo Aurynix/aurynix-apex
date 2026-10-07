@@ -49,7 +49,7 @@ Drift only shows that the data changed. When the real result of a lead is known 
 
 - Uses outcomes **recorded in the last 30 days** (conversions arrive later than predictions); needs **200** outcomes with both results present.
 - Sending an outcome again for the same prediction replaces it. Unknown ids are rejected (404) and nothing is saved.
-- `retrain_recommended` is `true` when performance or the score distribution is in drift.
+- `retrain_recommended` is `true` when performance or the score distribution is in drift. Act on it with `make retrain`, which replaces the model only if a new one is at least as good ([models.md](models.md#retraining-safely)).
 
 **Limit (feedback loop):** outcomes mostly arrive for leads that were called, and most called leads are High. Measured performance therefore leans toward the model's own choices. Keeping a small random sample of Medium / Low leads that are also called would make it unbiased ([ADR-008](decisions.md)).
 
