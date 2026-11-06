@@ -1,6 +1,6 @@
 """POST /predict/single, POST /predict/batch: validate → service → response."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from apex.api.dependencies import Service
 from apex.api.schemas import BatchPrediction, Lead, LeadBatch, Prediction
@@ -15,7 +15,13 @@ def predict_single(lead: Lead, service: Service) -> dict:
 
 
 @router.post("/batch", response_model=BatchPrediction)
-def predict_batch(batch: LeadBatch, service: Service) -> dict:
-    """Score a list of leads (up to 10,000); results keep the input order."""
+def predict_batch(batch: LeadBatch, service: Service, request: Request) -> dict:
+    """Score a list of leads; results keep the input order.
+
+    The most leads per request is `max_batch_size` in `GET /model/info`.
+    """
+    limit = request.app.state.settings.max_batch_size
+    if len(batch.leads) > limit:
+        raise HTTPException(413, f"Too many leads: the limit is {limit} per request.")
     predictions = service.score([lead.to_row() for lead in batch.leads])
     return {"count": len(predictions), "predictions": predictions}

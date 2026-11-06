@@ -3,8 +3,10 @@
 With `SEED_DEMO_DATA=true`, API startup fills an empty database from deploy/demo_seed.json:
 real leads from the held-out test set with their real outcomes, scored by the saved
 model, with timestamps spread over the monitoring windows, then runs monitoring once.
-The rows are marked `source = "demo_seed"`, and retraining ignores them. Nothing happens
-if `predictions` already has rows, so restarts never add more.
+The rows are marked `source = "demo_seed"`, and retraining ignores them. New rows are
+added only if `predictions` is empty, so restarts never add more. Once a day at most,
+the demo rows get fresh timestamps, so they stay inside the monitoring windows; nothing
+else about them changes, and other rows are not touched.
 
     python -m apex.monitoring.seed   (or `make demo-seed-file`)
 
@@ -23,7 +25,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from apex.api.database import insert_demo_rows
+from apex.api.database import insert_demo_rows, retime_demo_rows
 from apex.api.service import ScoringService
 from apex.config import load_config, path
 from apex.data.split import load_splits
@@ -38,6 +40,7 @@ SEED_ROWS = 600
 RECENT_DAYS = (0.1, 6.5)
 OLDER_DAYS = (7.5, 29.0)
 OUTCOME_DELAY = timedelta(days=1)
+REFRESH_AFTER = timedelta(days=1)
 
 
 def seed_enabled() -> bool:
@@ -90,6 +93,28 @@ def seed_demo_data(
     return saved
 
 
+def refresh_demo_data(service: ScoringService, monitor: Monitor) -> int:
+    """Move stale demo rows back into the monitoring windows and run monitoring.
+
+    Only the timestamps of `demo_seed` rows change. Returns the rows changed.
+    """
+    moment = datetime.now(UTC)
+    refreshed = retime_demo_rows(
+        service.db,
+        lambda n: timestamps(n, moment),
+        (moment - REFRESH_AFTER).isoformat(timespec="seconds"),
+    )
+    if refreshed:
+        monitor.run()
+    return refreshed
+
+
+def refresh_on_schedule(service: ScoringService, monitor: Monitor) -> None:
+    """Refresh demo rows if `SEED_DEMO_DATA=true`."""
+    if seed_enabled() and (refreshed := refresh_demo_data(service, monitor)):
+        logger.info("Demo data: %s rows refreshed.", refreshed)
+
+
 def seed_on_startup(service: ScoringService, monitor: Monitor) -> None:
     """Seed if `SEED_DEMO_DATA=true`. A failure is logged and never stops the API."""
     if not seed_enabled():
@@ -99,7 +124,8 @@ def seed_on_startup(service: ScoringService, monitor: Monitor) -> None:
     except Exception:
         logger.exception("Demo data was not seeded; the API continues without it.")
         return
-    logger.info("Demo data: %s rows seeded.", saved)
+    if saved:
+        logger.info("Demo data: %s rows seeded.", saved)
 
 
 def build_seed_file(n: int = SEED_ROWS) -> list[dict[str, Any]]:

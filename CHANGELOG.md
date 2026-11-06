@@ -9,9 +9,13 @@ Software versions of Aurynix Apex. The **model version** (`apex-v0.1.0`, in `con
 - `make run`, `make run-prod`, `make monitor`, and `make retrain` read `.env`.
 
 **Fixed**
+- Rejected requests are logged at 2,000 characters at most: a huge invalid request could otherwise fill the database.
+- The Streamlit demo scored an uploaded CSV again on every click, which logged the same leads again.
 - Parallel requests could fail with HTTP 500 (`cannot start a transaction within a transaction`): API threads shared one SQLite connection without taking turns. Database calls now hold a lock. Found by a load test; 1,000 parallel requests now succeed.
 
 **Added**
+- **Public demo protection**, off unless configured ([ADR-012](docs/decisions.md)): `X-API-Key` for `POST /outcomes` and `POST /monitoring/run` (`API_KEY`), rate limit (`RATE_LIMIT_PER_MINUTE`), batch limit (`MAX_BATCH_SIZE`, shown in `GET /model/info`), clean-up of visitor rows (`VISITOR_RETENTION_DAYS`, `MAX_VISITOR_ROWS`), and monitoring on one source only (`MONITORING_SOURCE`).
+- Demo rows get fresh timestamps at most once a day, so the monitoring report never ages out.
 - **Demo data** (`SEED_DEMO_DATA=true`): an empty database is filled once with 600 real test-set leads and outcomes, marked `source = 'demo_seed'` and ignored by `make retrain`, then monitoring runs once ([ADR-011](docs/decisions.md)).
 - `GET /health/db` (database check) and a redirect from `/` to `/docs`. `/health` never touches the database.
 - Free Render demo: `render.yaml`, `Dockerfile.render`, and the model in `deploy/models/` (`make deploy-model`). The demo waits for a sleeping API (`API_WAKE_SECONDS`), retries, and tells the user it is starting.

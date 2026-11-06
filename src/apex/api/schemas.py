@@ -98,6 +98,7 @@ class ModelInfo(BaseModel):
     input_fields: list[str]
     segment_thresholds: dict[str, float]
     test_metrics: dict[str, float]
+    max_batch_size: int = Field(description="The most leads per POST /predict/batch")
 
 
 class Health(BaseModel):

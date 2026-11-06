@@ -1,14 +1,15 @@
 """POST /outcomes: real results of scored leads, for performance monitoring."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Security
 
 from apex.api.dependencies import Service
 from apex.api.schemas import OutcomeBatch, OutcomesSaved
+from apex.api.security import api_key_scheme
 
 router = APIRouter(prefix="/outcomes", tags=["outcomes"])
 
 
-@router.post("", response_model=OutcomesSaved)
+@router.post("", response_model=OutcomesSaved, dependencies=[Security(api_key_scheme)])
 def record_outcomes(batch: OutcomeBatch, service: Service) -> dict:
     """Record whether scored leads converted (by `prediction_id`).
 

@@ -20,8 +20,18 @@ from apex.models.train import make_model
 from apex.monitoring.monitor import Monitor
 from apex.monitoring.reference import build_profile
 
-os.environ.pop("DATABASE_URL", None)
-os.environ.pop("SEED_DEMO_DATA", None)
+for name in (
+    "DATABASE_URL",
+    "SEED_DEMO_DATA",
+    "API_KEY",
+    "RATE_LIMIT_PER_MINUTE",
+    "MAX_BATCH_SIZE",
+    "VISITOR_RETENTION_DAYS",
+    "MAX_VISITOR_ROWS",
+    "MONITORING_SOURCE",
+    "TRUST_CF_CONNECTING_IP",
+):
+    os.environ.pop(name, None)
 
 
 def synthetic_leads(n: int, seed: int = 0) -> pd.DataFrame:

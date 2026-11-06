@@ -28,7 +28,7 @@ It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-puls
 
 > ⏳ **The first visit can take up to 2 minutes.** The demo runs on free hosting, where services sleep after 15 minutes without traffic. The page waits while they wake up; if it shows an error, refresh it.
 
-> 🧪 **Sample data only.** The API has no login, so do not send real customer data. How it is hosted and what the demo data is: [Deployment](#deployment).
+> 🧪 **Sample data only.** Scoring is open to try, so do not send real customer data. How it is hosted, protected, and what the demo data is: [Deployment](#deployment).
 
 ---
 
@@ -304,11 +304,13 @@ make run     # → http://localhost:8000/docs
 | `GET` | `/health/db` | Database check: `ok` or `503`, and which database is in use |
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
-| `POST` | `/predict/batch` | Score a list of leads (up to 10,000) |
-| `POST` | `/outcomes` | Send real results (converted or not) by `prediction_id` |
-| `POST` | `/monitoring/run` | Run monitoring now (drift, data quality, performance) |
+| `POST` | `/predict/batch` | Score a list of leads (up to 10,000; 100 on the public demo) |
+| `POST` | `/outcomes` 🔑 | Send real results (converted or not) by `prediction_id` |
+| `POST` | `/monitoring/run` 🔑 | Run monitoring now (drift, data quality, performance) |
 | `GET` | `/monitoring/latest` | Latest drift report |
 | `GET` | `/monitoring/history` | Status and score drift over time |
+
+🔑 Needs the `X-API-Key` header when `API_KEY` is set on the server ([protection](#protecting-the-public-demo)).
 
 **Response of `/predict/single`** (reasons are always included, so there is no separate explain call):
 
@@ -432,11 +434,25 @@ So that visitors see a real monitoring report, a fresh demo database is filled o
 
 - **Real rows:** 600 leads from the held-out test set, with their real outcomes, scored by the real model ([`deploy/demo_seed.json`](deploy/demo_seed.json)).
 - **Spread over time:** 300 predictions in the last 7 days, and 600 outcomes in the last 30 days, which passes the monitoring thresholds. Monitoring runs once afterwards, so `GET /monitoring/latest` has a report.
-- **Clearly marked:** the rows have `source = 'demo_seed'`. Monitoring includes them, and `make retrain` ignores them, so they can never decide whether a model is replaced.
-- **Idempotent:** it runs only when `predictions` is empty, so restarts add nothing.
+- **Clearly marked:** the rows have `source = 'demo_seed'`. On the demo, monitoring reads only these rows (`MONITORING_SOURCE`), and the report says so. `make retrain` ignores them, so they can never decide whether a model is replaced.
+- **Idempotent:** new rows are added only when `predictions` is empty, so restarts add nothing.
+- **Kept fresh:** at most once a day, the demo rows get new timestamps and monitoring runs again, so they never age out of the monitoring windows. Only the timestamps of `demo_seed` rows change. The dates in the report therefore show how monitoring works, not when these leads arrived.
 - **Illustrative:** the final model was trained on all leads, including these. The demo's PR-AUC (about 0.81) is therefore slightly optimistic. It shows how monitoring works; the real evidence is in [Results](#results).
 
-The seeded rows age. After 7 days a new monitoring run sees only visitors' predictions, and may report `insufficient_data`. To start over, see [Reset the demo data](docs/deployment.md#reset-the-demo-data).
+### Protecting the public demo
+
+Data now persists, so misuse would last. Everything below is set by environment variables in [`render.yaml`](render.yaml), and is off for local use unless noted.
+
+| Risk | Protection |
+|---|---|
+| Fake outcomes or monitoring runs | `POST /outcomes` and `POST /monitoring/run` need `X-API-Key`. Render generates the key and shares it with the Streamlit demo on the server, so visitors use the demo without ever seeing it |
+| A missing key setting | With `DATABASE_URL` set but no `API_KEY`, those two endpoints refuse every request instead of staying open |
+| Visitors changing the CV report | Monitoring reads only demo rows, so leads sent to the open `/predict` endpoints cannot change it |
+| Scripts sending many requests | 30 requests a minute per client, for `/predict/*`, `/monitoring/*`, and `/health/db`, based on Cloudflare's client address, which `X-Forwarded-For` cannot fake. The demo's key is exempt, because all its visitors share one address |
+| Huge requests | At most 100 leads per batch for every caller, and rejected requests are logged at 2,000 characters at most |
+| Filling the 1 GB database | Visitor rows older than 30 days are deleted, and only the newest 100,000 are kept. This is the hard limit: the rate limit alone would still allow about 4 million rows a day. Demo rows are never deleted |
+
+Limits are counted in memory, per API process, and reset when the service restarts. `/predict/*` stays open on purpose so that anyone can try it from [`/docs`](https://aurynix-apex.onrender.com/docs). This protects a demo; real customer data would need real authentication for every endpoint.
 
 ### Cold starts
 
@@ -520,6 +536,7 @@ aurynix-apex/
 │           ├── dependencies.py    # load model once, inject services
 │           ├── service.py         # ScoringService: score, segment, explain, log, outcomes
 │           ├── database.py        # Postgres or SQLite: tables and queries
+│           ├── security.py        # API key, rate limit, and other public-demo settings
 │           └── routers/
 │               ├── model.py
 │               ├── predict.py
@@ -647,7 +664,14 @@ Environment variables (see [`.env.example`](.env.example)):
 | Variable | Default | Use |
 |---|---|---|
 | `DATABASE_URL` | empty: local SQLite | Postgres connection string; `postgres://` and `postgresql://` both work. A secret: never commit it |
-| `SEED_DEMO_DATA` | off | `true` fills an empty database with [demo data](#demo-data) at API startup |
+| `SEED_DEMO_DATA` | off | `true` fills an empty database with [demo data](#demo-data) at API startup and keeps it fresh |
+| `API_KEY` | empty | Required by `/outcomes` and `/monitoring/run`; the Streamlit demo sends it. With `DATABASE_URL` set and no key, those endpoints refuse every request. A secret |
+| `RATE_LIMIT_PER_MINUTE` | off | Requests per client for `/predict/*`, `/monitoring/*`, `/health/db` |
+| `MAX_BATCH_SIZE` | `10000` | Most leads per `/predict/batch` |
+| `VISITOR_RETENTION_DAYS` | off | Delete visitor predictions, rejected requests, and old reports after this many days |
+| `MAX_VISITOR_ROWS` | off | Keep only this many of the newest visitor predictions and rejected requests |
+| `MONITORING_SOURCE` | every row | Monitor only rows from this source (`demo_seed` on the demo) |
+| `TRUST_CF_CONNECTING_IP` | off | `true` only behind Cloudflare: use its client address header for the rate limit |
 | `API_WAKE_SECONDS` | `0` | How long the Streamlit demo waits for a sleeping API |
 | `API_URL` | `http://localhost:8000` | The API the Streamlit demo calls |
 | `APEX_CONFIG` | `config.json` | The config file to use |
@@ -686,6 +710,7 @@ Environment variables (see [`.env.example`](.env.example)):
 - [x] `outcomes` table and live performance tracking
 - [x] Apply the pipeline to the Bank Marketing dataset
 - [x] Public demo: Render + Neon Postgres, with marked demo data
+- [x] Public demo protection: API key, rate limit, batch limit, clean-up, fresh demo data
 - [ ] Integration with Aurynix Pulse
 
 ## Design Decisions

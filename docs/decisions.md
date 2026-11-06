@@ -15,6 +15,7 @@ Short records of decisions that shape the model and the system. Newest last.
 | [009](#adr-009-one-pipeline-one-config-per-dataset) | One pipeline, one config per dataset | 6 |
 | [010](#adr-010-safe-retraining-champion-vs-challenger) | Safe retraining: champion vs. challenger | — |
 | [011](#adr-011-postgres-through-database_url-with-marked-demo-data) | Postgres through `DATABASE_URL`, with marked demo data | — |
+| [012](#adr-012-protect-the-public-demo-with-settings-not-accounts) | Protect the public demo with settings, not accounts | — |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -194,5 +195,18 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 
 **Why.** It keeps data at no cost, and local development and tests still need no database server. Marking the rows keeps them easy to filter and delete. `make retrain` ignores them: the final model was trained on these same leads, so they would favor the current model and are not new results.
 
-**Consequences.** A new connection per use adds some delay per request, which is fine for a demo but should be revisited for real traffic. The monitoring report on the demo is illustrative, since the rows are in-sample. Seeded rows age out of the monitoring windows (7 and 30 days), so the demo needs an occasional reset. The demo database is open to anyone until the API has authentication.
+**Consequences.** A new connection per use adds some delay per request, which is fine for a demo but should be revisited for real traffic. The monitoring report on the demo is illustrative, since the rows are in-sample. Seeded rows age out of the monitoring windows (7 and 30 days); ADR-012 keeps them fresh. The demo database is open to anyone until the API has authentication; ADR-012 limits that.
 
+---
+
+## ADR-012: Protect the public demo with settings, not accounts
+
+- **Date:** 2026-11-06 · **Status:** Accepted
+
+**Context.** With persistent data (ADR-011), misuse would last: fake outcomes could ruin the monitoring report, a script could fill Neon's 1 GB, and the seeded rows would age out of the monitoring windows within a week. A test also showed that an API key on `/outcomes` is not enough: 132 leads sent through the open `/predict` turned the report to `drift` and "retraining recommended".
+
+**Decision.** Optional environment variables, all off for local use. `X-API-Key` guards `POST /outcomes` and `POST /monitoring/run`, and a persistent database without a key refuses those requests. A per-client rate limit and a smaller batch limit cover open traffic. Visitor rows are deleted by age and capped by count. `MONITORING_SOURCE=demo_seed` makes the demo's report read only demo rows. Demo rows get fresh timestamps at most once a day, and only `demo_seed` rows change.
+
+**Why.** Visitors can still try scoring without an account, which is the point of a demo. The checks run in middleware, before the body is parsed, so refused requests cost almost nothing and log nothing. The row cap is the real storage limit: 30 requests a minute × 100 leads is still about 4 million rows a day. The client address comes from `CF-Connecting-IP`, because `X-Forwarded-For` keeps what the client sent. No new dependency is needed.
+
+**Consequences.** The demo's report describes sample leads with refreshed dates, and not visitors' traffic; the report and the page say so. Limits are per process and reset on restart, which is enough for one small worker. Many addresses working together could still push out other visitors' rows, but cannot reach the demo rows or exceed the cap by much. The Streamlit demo's key is exempt from the rate limit, so its traffic relies on the batch limit and the cap. Real customers would need real authentication on every endpoint.

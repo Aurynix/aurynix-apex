@@ -120,7 +120,84 @@ def test_a_seed_failure_does_not_stop_the_api(service, monitor, monkeypatch):
         assert client.get("/health").status_code == 200
 
 
+def _make_old(db, days):
+    """Move every demo row `days` into the past, as if the seed had run back then."""
+    moment = datetime.now(UTC) - timedelta(days=days)
+    created, recorded = seed.timestamps(600, moment)
+    with db.transaction() as conn:
+        for i, (c, r) in enumerate(zip(created, recorded, strict=True), start=1):
+            conn.exec_driver_sql(f"UPDATE predictions SET created_at = '{c}' WHERE id = {i}")
+            conn.exec_driver_sql(
+                f"UPDATE outcomes SET recorded_at = '{r}' WHERE prediction_id = {i}"
+            )
+
+
+def test_refresh_keeps_monitoring_working_after_the_rows_age(service, real_thresholds):
+    seed.seed_demo_data(service, real_thresholds, seed_rows())
+    _make_old(service.db, days=60)
+    assert real_thresholds.run()["status"] == "insufficient_data"
+
+    assert seed.refresh_demo_data(service, real_thresholds) == 600
+    report = real_thresholds.history(limit=1)[0]
+    assert report["n_samples"] == 300
+    assert report["performance"]["n_outcomes"] == 600
+    assert report["status"] != "insufficient_data"
+
+
+def test_refresh_changes_only_the_timestamps_of_demo_rows(service, real_thresholds):
+    seed.seed_demo_data(service, real_thresholds, seed_rows())
+    _make_old(service.db, days=60)
+    visitor = service.score([seed_rows(1)[0]["lead"]])[0]["prediction_id"]
+    service.record_outcomes({visitor: True})
+    with service.db.transaction() as conn:
+        conn.exec_driver_sql(f"UPDATE predictions SET created_at = '2020' WHERE id = {visitor}")
+    columns = "id, model_version, lead, score, segment, source"
+    before = service.db.rows(f"SELECT {columns} FROM predictions ORDER BY id")
+    outcomes = service.db.rows("SELECT prediction_id, converted FROM outcomes ORDER BY 1")
+    visitor_time = service.db.rows(
+        f"SELECT p.created_at, o.recorded_at FROM predictions p JOIN outcomes o "
+        f"ON o.prediction_id = p.id WHERE p.id = {visitor}"
+    )
+
+    assert seed.refresh_demo_data(service, real_thresholds) == 600
+    assert service.db.rows(f"SELECT {columns} FROM predictions ORDER BY id") == before
+    assert service.db.rows("SELECT prediction_id, converted FROM outcomes ORDER BY 1") == outcomes
+    assert visitor_time == service.db.rows(
+        f"SELECT p.created_at, o.recorded_at FROM predictions p JOIN outcomes o "
+        f"ON o.prediction_id = p.id WHERE p.id = {visitor}"
+    )
+
+
+def test_fresh_rows_are_not_refreshed(service, real_thresholds):
+    seed.seed_demo_data(service, real_thresholds, seed_rows())
+    runs = len(real_thresholds.history())
+    assert seed.refresh_demo_data(service, real_thresholds) == 0
+    assert len(real_thresholds.history()) == runs
+
+
+def test_refresh_does_nothing_without_demo_rows(service, real_thresholds):
+    service.score([seed_rows(1)[0]["lead"]])
+    assert seed.refresh_demo_data(service, real_thresholds) == 0
+    assert real_thresholds.history() == []
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_startup_refreshes_only_when_seeding_is_enabled(enabled, service, monitor, monkeypatch):
+    seed.seed_demo_data(service, monitor, seed_rows())
+    _make_old(service.db, days=60)
+    newest = "SELECT MAX(created_at) FROM predictions"
+    stale = service.db.scalar(newest)
+
+    if enabled:
+        monkeypatch.setenv("SEED_DEMO_DATA", "true")
+    else:
+        monkeypatch.delenv("SEED_DEMO_DATA", raising=False)
+    with TestClient(create_app(service, monitor)):
+        assert (service.db.scalar(newest) != stale) is enabled
+
+
 def test_committed_seed_file_has_only_model_fields_and_enough_rows():
+
     cfg = load_config()
     rows = json.loads(path("demo_seed").read_text(encoding="utf-8"))
     assert len(rows) // 2 >= cfg["monitoring"]["min_samples"]
