@@ -118,8 +118,8 @@ deploy-model: ## Copy the saved model to deploy/models/ for the Render image (co
 	mkdir -p deploy/models
 	cp models/model.pkl models/model_meta.json models/reference_profile.json deploy/models/
 
-demo-seed-file: ## Rebuild deploy/demo_seed.json from the test split (needs `make split`; commit the result)
-	$(RUN) python -m apex.monitoring.seed
+demo-seed-file: ## Regenerate the synthetic deploy/demo_seed.json (fixed seed, no dataset needed; commit the result)
+	$(RUN) python -m apex.monitoring.synthetic
 
 # ---------- Quality ----------
 lint: ## Lint with Ruff

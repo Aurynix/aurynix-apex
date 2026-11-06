@@ -123,11 +123,11 @@ Start again with fresh timestamps, for example when the rows have aged out of th
 TRUNCATE outcomes, predictions, rejected_requests, drift_runs RESTART IDENTITY;
 ```
 
-Rebuild the rows themselves with `make demo-seed-file` (needs `make split`), and commit `deploy/demo_seed.json`.
+Regenerate the synthetic rows with `make demo-seed-file` (fixed seed, no dataset needed), and commit `deploy/demo_seed.json`.
 
 ### New model
 
-Free services have nothing to mount, so the model is part of the image. After `make train` or `make retrain`, run `make deploy-model`, commit `deploy/models/`, and merge to `main`. Do not commit a model trained on private data: this repository is public.
+Free services have nothing to mount, so the model is part of the image. After `make train` or `make retrain`, run `make deploy-model` and `make demo-seed-file`, commit `deploy/`, and merge to `main`. The demo rows depend on the model, and a test checks that they match. Do not commit a model trained on private data: this repository is public.
 
 ### Free plan limits
 

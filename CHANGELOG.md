@@ -12,7 +12,7 @@ Software versions of Aurynix Apex. The **model version** (`apex-v0.1.0`, in `con
 - Parallel requests could fail with HTTP 500 (`cannot start a transaction within a transaction`): API threads shared one SQLite connection without taking turns. Database calls now hold a lock. Found by a load test; 1,000 parallel requests now succeed.
 
 **Added**
-- **Demo data** (`SEED_DEMO_DATA=true`): an empty database is filled once with 600 real test-set leads and outcomes, marked `source = 'demo_seed'` and ignored by `make retrain`, then monitoring runs once ([ADR-011](docs/decisions.md)).
+- **Demo data** (`SEED_DEMO_DATA=true`): an empty database is filled once with 600 synthetic leads and outcomes (`make demo-seed-file`; no real rows), marked `source = 'demo_seed'` and ignored by `make retrain`, then monitoring runs once ([ADR-011](docs/decisions.md)).
 - `GET /health/db` (database check) and a redirect from `/` to `/docs`. `/health` never touches the database.
 - Free Render demo: `render.yaml`, `Dockerfile.render`, and the model in `deploy/models/` (`make deploy-model`). The demo waits for a sleeping API (`API_WAKE_SECONDS`), retries, and tells the user it is starting.
 - Server sizing in `docs/deployment.md` (measured: API ~240 MB under load, training ~380 MB; 1 GB minimum, 2 GB comfortable).
