@@ -15,6 +15,7 @@ models/*
 !models/.gitkeep
 !models/model_card.json
 *.pkl
+!deploy/models/*.pkl
 *.joblib
 *.onnx
 

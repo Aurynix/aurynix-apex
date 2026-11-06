@@ -10,6 +10,7 @@ and drift monitoring.
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -17,6 +18,10 @@ import pandas as pd
 import streamlit as st
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
+# How long to wait for a sleeping API to wake up (free hosting). 0 = fail at once (local use).
+API_WAKE_SECONDS = float(os.environ.get("API_WAKE_SECONDS", "0"))
+WAKE_RETRY_SECONDS = 5
+WAKE_STATUS_CODES = (502, 503, 504)  # what a host may answer while the API is starting
 
 # Raw Kaggle column → API field, so Leads.csv can be uploaded as-is.
 RAW_TO_API = {
@@ -33,6 +38,10 @@ SEGMENT_ICON = {"high": "🟢 High", "medium": "🟡 Medium", "low": "🔴 Low"}
 STATUS_ICON = {"ok": "🟢 ok", "warning": "🟡 warning", "drift": "🔴 drift"}
 
 
+class ApiUnavailable(RuntimeError):
+    """The API cannot be reached right now, or is still starting."""
+
+
 def call(method: str, path: str, payload: dict | None = None) -> dict:
     """Call the API and return its JSON; raises RuntimeError with a readable message."""
     data = json.dumps(payload).encode() if payload is not None else None
@@ -43,9 +52,25 @@ def call(method: str, path: str, payload: dict | None = None) -> dict:
         with urllib.request.urlopen(request, timeout=60) as response:
             return json.load(response)
     except urllib.error.HTTPError as err:
+        if err.code in WAKE_STATUS_CODES:
+            raise ApiUnavailable(f"The API at {API_URL} is not ready (HTTP {err.code}).") from err
         raise RuntimeError(f"API error {err.code}: {err.read().decode()[:500]}") from err
     except urllib.error.URLError as err:
-        raise RuntimeError(f"Cannot reach the API at {API_URL} ({err.reason}).") from err
+        raise ApiUnavailable(f"Cannot reach the API at {API_URL} ({err.reason}).") from err
+    except TimeoutError as err:
+        raise ApiUnavailable(f"Cannot reach the API at {API_URL} (timed out).") from err
+
+
+def wait_for_api(path: str, wait_seconds: float) -> dict:
+    """GET `path`, retrying while the API is unavailable, for up to `wait_seconds`."""
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            return call("GET", path)
+        except ApiUnavailable:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(WAKE_RETRY_SECONDS)
 
 
 def leads_from_csv(df: pd.DataFrame) -> list[dict]:
@@ -205,9 +230,18 @@ def main() -> None:
     st.set_page_config(page_title="Aurynix Apex", page_icon="🎯", layout="wide")
     st.title("🎯 Aurynix Apex: lead scoring")
     try:
-        info = call("GET", "/model/info")
+        with st.spinner("API is starting up, please wait. This can take up to 2 minutes..."):
+            info = wait_for_api("/model/info", API_WAKE_SECONDS)
+    except ApiUnavailable as err:
+        hint = (
+            "It may still be starting: refresh this page in a minute."
+            if API_WAKE_SECONDS
+            else "Start it with `make run` (or `make docker-up`)."
+        )
+        st.error(f"{err} {hint}")
+        return
     except RuntimeError as err:
-        st.error(f"{err} Start it with `make run` (or `make docker-up`).")
+        st.error(str(err))
         return
     test = info["test_metrics"]
     st.sidebar.markdown(

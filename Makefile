@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain time-split retrain train cv tune predict pipeline run run-prod demo \
-        monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down lint format test clean
+        monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down deploy-model lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
 RUN := uv run
@@ -110,6 +110,11 @@ docker-up: ## Start API + demo in Docker (needs `make train` first; uses models/
 
 docker-down: ## Stop containers
 	docker compose down
+
+deploy-model: ## Copy the saved model to deploy/models/ for the Render image (commit the result)
+	@test -f models/model.pkl || (echo "models/model.pkl not found: run \`make train\` first." && exit 1)
+	mkdir -p deploy/models
+	cp models/model.pkl models/model_meta.json models/reference_profile.json deploy/models/
 
 # ---------- Quality ----------
 lint: ## Lint with Ruff
