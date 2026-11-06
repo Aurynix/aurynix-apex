@@ -1,0 +1,142 @@
+{
+  "model_version": "apex-v0.1.0",
+  "trained_at": "2026-10-07T03:25:59+00:00",
+  "sklearn_version": "1.9.1",
+  "data": {
+    "file": "Leads.csv",
+    "sha256": "1426dffd94246b8c7f08d1080d9c04115a0c4b67eadcba1ed9d2fa10d3762802",
+    "rows": 9240,
+    "raw_columns": 37,
+    "conversion_rate": 0.3854
+  },
+  "input_fields": [
+    "Lead Origin",
+    "Lead Source",
+    "Do Not Email",
+    "TotalVisits",
+    "Total Time Spent on Website",
+    "Specialization",
+    "What is your current occupation"
+  ],
+  "model_inputs": [
+    "Do Not Email",
+    "TotalVisits",
+    "Total Time Spent on Website",
+    "time_per_visit",
+    "has_web_activity",
+    "Lead Origin_API",
+    "Lead Origin_Landing Page Submission",
+    "Lead Origin_Lead Add Form",
+    "Lead Origin_infrequent_sklearn",
+    "Lead Source_Direct Traffic",
+    "Lead Source_Google",
+    "Lead Source_Olark Chat",
+    "Lead Source_Organic Search",
+    "Lead Source_Reference",
+    "Lead Source_Referral Sites",
+    "Lead Source_Welingak Website",
+    "Lead Source_infrequent_sklearn",
+    "Specialization_Given",
+    "Specialization_Missing",
+    "What is your current occupation_Missing",
+    "What is your current occupation_Student",
+    "What is your current occupation_Unemployed",
+    "What is your current occupation_Working Professional",
+    "What is your current occupation_infrequent_sklearn"
+  ],
+  "hyperparameters": {
+    "C": 1.0,
+    "class_weight": null,
+    "max_iter": 1000,
+    "solver": "lbfgs"
+  },
+  "segments": {
+    "shares": {
+      "high_share": 0.2,
+      "medium_share": 0.3
+    },
+    "thresholds": {
+      "high": 0.7462,
+      "medium": 0.2748
+    },
+    "table": {
+      "High": {
+        "leads": 1848,
+        "share_of_leads": 0.2,
+        "conversions": 1590,
+        "rate": 0.8604,
+        "share_of_conversions": 0.4465
+      },
+      "Medium": {
+        "leads": 2773,
+        "share_of_leads": 0.3001,
+        "conversions": 1442,
+        "rate": 0.52,
+        "share_of_conversions": 0.4049
+      },
+      "Low": {
+        "leads": 4619,
+        "share_of_leads": 0.4999,
+        "conversions": 529,
+        "rate": 0.1145,
+        "share_of_conversions": 0.1486
+      }
+    }
+  },
+  "performance": {
+    "test": {
+      "pr_auc": 0.7874,
+      "roc_auc": 0.8548,
+      "brier": 0.1492,
+      "ece": 0.0406,
+      "precision_at_0.5": 0.7669,
+      "recall_at_0.5": 0.6517,
+      "precision_top20": 0.8324,
+      "recall_top20": 0.4326,
+      "lift_top20": 2.1629,
+      "precision_top50": 0.658,
+      "recall_top50": 0.8539,
+      "lift_top50": 1.7079
+    },
+    "out_of_fold_all": {
+      "pr_auc": 0.8167,
+      "roc_auc": 0.8697,
+      "brier": 0.1399,
+      "ece": 0.0301,
+      "precision_at_0.5": 0.7945,
+      "recall_at_0.5": 0.6712,
+      "precision_top20": 0.8604,
+      "recall_top20": 0.4465,
+      "lift_top20": 2.2325,
+      "precision_top50": 0.6563,
+      "recall_top50": 0.8514,
+      "lift_top50": 1.7029
+    }
+  },
+  "explainer_means": {
+    "Do Not Email": 0.0,
+    "TotalVisits": -0.0,
+    "Total Time Spent on Website": -0.0,
+    "time_per_visit": -0.0,
+    "has_web_activity": 0.0,
+    "Lead Origin_API": 0.387446,
+    "Lead Origin_Landing Page Submission": 0.528788,
+    "Lead Origin_Lead Add Form": 0.077706,
+    "Lead Origin_infrequent_sklearn": 0.006061,
+    "Lead Source_Direct Traffic": 0.275216,
+    "Lead Source_Google": 0.310931,
+    "Lead Source_Olark Chat": 0.189935,
+    "Lead Source_Organic Search": 0.124892,
+    "Lead Source_Reference": 0.057792,
+    "Lead Source_Referral Sites": 0.013528,
+    "Lead Source_Welingak Website": 0.015368,
+    "Lead Source_infrequent_sklearn": 0.012338,
+    "Specialization_Given": 0.634199,
+    "Specialization_Missing": 0.365801,
+    "What is your current occupation_Missing": 0.291126,
+    "What is your current occupation_Student": 0.022727,
+    "What is your current occupation_Unemployed": 0.606061,
+    "What is your current occupation_Working Professional": 0.076407,
+    "What is your current occupation_infrequent_sklearn": 0.00368
+  }
+}

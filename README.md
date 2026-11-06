@@ -427,7 +427,7 @@ aurynix-apex/
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md                     # API design & reference
 │   ├── monitoring.md              # drift, data quality, outcomes & simulations
-│   ├── deployment.md              # local, Docker, CI/CD
+│   ├── deployment.md              # local, Docker, CI/CD, free Render demo
 │   └── bank_marketing.md          # second dataset: report & comparison
 ├── notebooks/                     # local scratch for testing (git-ignored)
 ├── src/
@@ -483,6 +483,8 @@ aurynix-apex/
 ├── Dockerfile
 ├── .dockerignore
 ├── docker-compose.yml
+├── Dockerfile.render              # free Render demo: the image includes deploy/models/
+├── render.yaml                    # free Render demo: API + Streamlit services
 ├── BUILD_STEPS.md                 # step-by-step build plan
 ├── CHANGELOG.md                   # changes per software version
 ├── LICENSE
@@ -567,6 +569,7 @@ Run `make help` for the full list.
 | | `make outcomes-demo` | Send real outcomes, then changed behavior; the performance check recommends retraining |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
 | Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build the image / start API + demo / stop |
+| Render | `make deploy-model` | Copy the saved model to `deploy/models/` for the free Render demo |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
 
 ## Configuration

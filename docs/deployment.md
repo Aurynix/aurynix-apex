@@ -81,7 +81,23 @@ docker pull ghcr.io/aurynix/aurynix-apex:0.2.0   # or :latest
 docker run -p 8000:8000 -v ./models:/app/models:ro -v ./data:/app/data ghcr.io/aurynix/aurynix-apex:latest
 ```
 
-The repository is private, so the image is private too: `docker login ghcr.io` with a GitHub token that has `read:packages` first.
+If the image is not public, run `docker login ghcr.io` first, with a GitHub token that has `read:packages`.
+
+## Free demo on Render
+
+[`render.yaml`](../render.yaml) creates two free web services from [`Dockerfile.render`](../Dockerfile.render): `aurynix-apex` (API) and `aurynix-apex-demo` (Streamlit). This is a public demo for sample data, not a production setup.
+
+**Deploy:** merge to `main`, then in Render choose **New → Blueprint**, select this repository, and click **Apply**. If the API's URL is not `https://aurynix-apex.onrender.com`, update `API_URL` on the demo service.
+
+**New model:** free services have nothing to mount, so the model is part of the image. After `make train` or `make retrain`, run `make deploy-model`, commit `deploy/models/`, and merge to `main`. Do not commit a model trained on private data: this repository is public.
+
+| Free plan limit | Effect on Apex |
+|---|---|
+| Sleeps after 15 minutes without traffic; waking takes about a minute | The demo and the API wake separately. The demo waits for the API (`API_WAKE_SECONDS`) and shows that it is starting |
+| No persistent disk | `data/apex.db` is wiped on restart or sleep. To show monitoring, score at least 200 leads, then run monitoring before the service sleeps |
+| 750 free hours per month, shared across the workspace | Sleeping services use none, so do not keep the services awake with a pinger |
+| 512 MB RAM, 0.1 CPU per service | Enough, but slower. Measured locally in Docker with these limits: API ready in 16 s, API 184 MB and demo 51 MB after the tests, one lead 0.5 s, a batch of 10,000 leads 25 s |
+| Public URL, no login in the API | Use sample data only. Add authentication and a disk (a paid plan) before real leads |
 
 ## Server sizing
 

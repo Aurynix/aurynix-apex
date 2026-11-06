@@ -1,0 +1,187 @@
+{
+  "model_version": "apex-v0.1.0",
+  "rows": 9240,
+  "numeric": {
+    "Do Not Email": {
+      "edges": [
+        -Infinity,
+        0.0,
+        Infinity
+      ],
+      "shares": [
+        0.920563,
+        0.079437
+      ]
+    },
+    "TotalVisits": {
+      "edges": [
+        -Infinity,
+        0.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        7.0,
+        Infinity
+      ],
+      "shares": [
+        0.236905,
+        0.224567,
+        0.156169,
+        0.121212,
+        0.08474,
+        0.083874,
+        0.092532
+      ]
+    },
+    "Total Time Spent on Website": {
+      "edges": [
+        -Infinity,
+        0.0,
+        57.0,
+        146.0,
+        248.0,
+        372.0,
+        715.0,
+        1087.2000000000007,
+        1380.0,
+        Infinity
+      ],
+      "shares": [
+        0.237338,
+        0.063312,
+        0.099459,
+        0.100108,
+        0.099892,
+        0.1,
+        0.099892,
+        0.100325,
+        0.099675
+      ]
+    },
+    "time_per_visit": {
+      "edges": [
+        -Infinity,
+        0.0,
+        13.25,
+        36.7357142857143,
+        67.58333333333334,
+        111.0,
+        174.55000000000004,
+        275.25,
+        448.6666666666667,
+        Infinity
+      ],
+      "shares": [
+        0.237338,
+        0.062879,
+        0.099784,
+        0.1,
+        0.100325,
+        0.099675,
+        0.100108,
+        0.1,
+        0.099892
+      ]
+    },
+    "has_web_activity": {
+      "edges": [
+        -Infinity,
+        0.0,
+        1.0,
+        Infinity
+      ],
+      "shares": [
+        0.236905,
+        0.763095,
+        0.0
+      ]
+    }
+  },
+  "categorical": {
+    "Lead Origin": {
+      "Landing Page Submission": 0.528788,
+      "API": 0.387446,
+      "Lead Add Form": 0.077706,
+      "Lead Import": 0.005952,
+      "Quick Add Form": 0.000108
+    },
+    "Lead Source": {
+      "Google": 0.310931,
+      "Direct Traffic": 0.275216,
+      "Olark Chat": 0.189935,
+      "Organic Search": 0.124892,
+      "Reference": 0.057792,
+      "Welingak Website": 0.015368,
+      "Referral Sites": 0.013528,
+      "Facebook": 0.005952,
+      "Missing": 0.003896,
+      "bing": 0.000649,
+      "Click2call": 0.000433,
+      "Social Media": 0.000216,
+      "Live Chat": 0.000216,
+      "Press_Release": 0.000216,
+      "blog": 0.000108,
+      "Pay per Click Ads": 0.000108,
+      "WeLearn": 0.000108,
+      "welearnblog_Home": 0.000108,
+      "youtubechannel": 0.000108,
+      "testone": 0.000108,
+      "NC_EDM": 0.000108
+    },
+    "Specialization": {
+      "Given": 0.634199,
+      "Missing": 0.365801
+    },
+    "What is your current occupation": {
+      "Unemployed": 0.606061,
+      "Missing": 0.291126,
+      "Working Professional": 0.076407,
+      "Student": 0.022727,
+      "Other": 0.001732,
+      "Housewife": 0.001082,
+      "Businessman": 0.000866
+    }
+  },
+  "missing_rate": {
+    "Lead Origin": 0.0,
+    "Lead Source": 0.003896,
+    "Do Not Email": 0.0,
+    "TotalVisits": 0.014827,
+    "Total Time Spent on Website": 0.0,
+    "Specialization": 0.365801,
+    "What is your current occupation": 0.291126
+  },
+  "score": {
+    "edges": [
+      -Infinity,
+      0.061844597217265804,
+      0.11564174621376688,
+      0.1418344632013035,
+      0.19487222842796262,
+      0.2747543558229799,
+      0.3351607588004564,
+      0.5625505847349697,
+      0.7461881946350274,
+      0.9148555135187905,
+      Infinity
+    ],
+    "shares": [
+      0.1,
+      0.108009,
+      0.091991,
+      0.1,
+      0.100433,
+      0.104978,
+      0.094589,
+      0.1,
+      0.1,
+      0.1
+    ]
+  },
+  "segment_shares": {
+    "Low": 0.499892,
+    "Medium": 0.300108,
+    "High": 0.2
+  }
+}

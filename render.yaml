@@ -1,0 +1,30 @@
+# Free public demo on Render (docs/deployment.md). Sample data only: the API has no login,
+# and SQLite is wiped whenever a free service restarts or sleeps.
+services:
+  - type: web
+    name: aurynix-apex
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile.render
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+
+  - type: web
+    name: aurynix-apex-demo
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile.render
+    dockerCommand: streamlit run app/demo.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: PORT
+        value: "8501"
+      - key: API_URL # change this if Render gives the API a different URL
+        value: https://aurynix-apex.onrender.com
+      - key: API_WAKE_SECONDS # a sleeping API takes about a minute to wake
+        value: "180"

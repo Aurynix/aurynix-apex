@@ -8,6 +8,7 @@ Software versions of Aurynix Apex. The **model version** (`apex-v0.1.0`, in `con
 - Parallel requests could fail with HTTP 500 (`cannot start a transaction within a transaction`): API threads shared one SQLite connection without taking turns. Database calls now hold a lock. Found by a load test; 1,000 parallel requests now succeed.
 
 **Added**
+- Free Render demo: `render.yaml`, `Dockerfile.render`, and the model in `deploy/models/` (`make deploy-model`). The demo waits for a sleeping API (`API_WAKE_SECONDS`), retries, and tells the user it is starting.
 - Server sizing in `docs/deployment.md` (measured: API ~240 MB under load, training ~380 MB; 1 GB minimum, 2 GB comfortable).
 - **Safe retraining** (`make retrain`): a new model replaces the saved one only if its PR-AUC is at least as good on the same held-out leads (real outcomes when available, otherwise a 20% holdout); the old model is archived in `models/archive/` ([ADR-010](docs/decisions.md)).
 
