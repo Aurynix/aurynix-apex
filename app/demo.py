@@ -13,10 +13,12 @@ import os
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 
 import pandas as pd
 import streamlit as st
 
+DEMO_SOURCE = "demo_seed"
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
 API_KEY = os.environ.get("API_KEY", "").strip()  # server side only: never shown to visitors
 # How long to wait for a sleeping API to wake up (free hosting). 0 = fail at once (local use).
@@ -37,6 +39,30 @@ RAW_TO_API = {
 FIELDS = list(RAW_TO_API.values())
 SEGMENT_ICON = {"high": "🟢 High", "medium": "🟡 Medium", "low": "🔴 Low"}
 STATUS_ICON = {"ok": "🟢 ok", "warning": "🟡 warning", "drift": "🔴 drift"}
+
+
+def time_ago(seconds: float) -> str:
+    """A duration in words, for example "2 min ago"."""
+    minutes = int(seconds // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} h ago"
+    days = hours // 24
+    return f"{days} day{'s' if days > 1 else ''} ago"
+
+
+def last_run(created_at: str, now: datetime | None = None) -> str:
+    """An ISO timestamp as "last run 2 min ago (6 Nov 2026, 22:48 UTC)"."""
+    try:
+        when = datetime.fromisoformat(created_at).astimezone(UTC)
+    except ValueError:
+        return f"last run {created_at}"
+    now = now or datetime.now(UTC)
+    return f"last run {time_ago((now - when).total_seconds())} ({when.day} {when:%b %Y, %H:%M} UTC)"
 
 
 class ApiUnavailable(RuntimeError):
@@ -189,7 +215,7 @@ def tab_monitoring() -> None:
         st.info("No monitoring run yet. Score some leads, then run monitoring.")
         return
     st.metric("Status", STATUS_ICON.get(report["status"], report["status"]))
-    st.caption(f"{report['n_samples']:,} predictions · run at {report['created_at']}")
+    st.caption(f"{report['n_samples']:,} predictions · {last_run(report['created_at'])}")
     if report.get("data_source"):
         st.caption(
             "This public demo reports on synthetic sample leads only, with recent timestamps, "
@@ -199,7 +225,7 @@ def tab_monitoring() -> None:
         st.error("Retraining recommended.")
 
     perf = report.get("performance", {})
-    st.subheader("Performance on real outcomes")
+    st.subheader("Performance on recorded outcomes")
     if perf.get("status", "insufficient_data") == "insufficient_data":
         st.info(
             f"Not enough outcomes yet ({perf.get('n_outcomes', 0):,}). "
@@ -209,16 +235,29 @@ def tab_monitoring() -> None:
         c1, c2, c3 = st.columns(3)
         c1.metric("Status", STATUS_ICON.get(perf["status"], perf["status"]))
         act, exp = perf["actual"], perf["expected"]
+        is_demo = report.get("data_source") == DEMO_SOURCE
+        # A better score than the test result is no achievement on demo data: keep it neutral.
+        delta_color = "off" if is_demo else "normal"
         c2.metric(
-            "PR-AUC", f"{act['pr_auc']:.3f}", f"{act['pr_auc'] - exp['pr_auc']:+.3f} vs. test"
+            "PR-AUC",
+            f"{act['pr_auc']:.3f}",
+            f"{act['pr_auc'] - exp['pr_auc']:+.3f} vs. test",
+            delta_color=delta_color,
         )
         if act["precision_high"] is not None:
             c3.metric(
                 "High segment precision",
                 f"{act['precision_high']:.0%}",
                 f"{act['precision_high'] - exp['precision_high']:+.0%} vs. test",
+                delta_color=delta_color,
             )
         st.caption(f"{perf['n_outcomes']:,} outcomes in the last {perf['window_days']} days")
+        if is_demo:
+            st.caption(
+                "Synthetic demo outcomes are drawn from the model's own probabilities, so this "
+                f"is higher than the real held-out test result ({exp['pr_auc']:.3f}). "
+                "It is not evidence of quality."
+            )
 
     if "features" not in report:
         st.warning(f"Not enough predictions for a reliable check (status: {report['status']}).")

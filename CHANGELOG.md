@@ -7,6 +7,7 @@ Software versions of Aurynix Apex. The **model version** (`apex-v0.1.0`, in `con
 **Changed**
 - **Postgres support:** the database layer now uses SQLAlchemy and psycopg 3. `DATABASE_URL` selects Postgres; without it, Apex uses local SQLite as before. The lead model, scoring, and API responses are unchanged, and older SQLite files gain the new `predictions.source` column automatically.
 - `make run`, `make run-prod`, `make monitor`, and `make retrain` read `.env`.
+- Streamlit demo: run times read "last run 2 min ago (6 Nov 2026, 22:48 UTC)", "Performance on real outcomes" is now "Performance on recorded outcomes", and on demo data a caption explains the score and the "vs. test" change is shown in a neutral color.
 
 **Fixed**
 - Rejected requests are logged at 2,000 characters at most: a huge invalid request could otherwise fill the database.
