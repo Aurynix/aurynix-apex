@@ -1,6 +1,9 @@
 import io
+import json
 import sys
 import urllib.error
+import urllib.request
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -68,6 +71,122 @@ def test_demo_sends_the_api_key_only_when_it_has_one(key, sent, monkeypatch):
     monkeypatch.setattr(demo.urllib.request, "urlopen", urlopen)
     demo.call("POST", "/monitoring/run")
     assert seen["key"] == sent
+
+
+NOW = datetime(2026, 11, 6, 22, 50, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("age", "words"),
+    [
+        (timedelta(seconds=30), "just now"),
+        (timedelta(minutes=2), "2 min ago"),
+        (timedelta(minutes=59), "59 min ago"),
+        (timedelta(hours=1), "1 h ago"),
+        (timedelta(hours=23), "23 h ago"),
+        (timedelta(days=1), "1 day ago"),
+        (timedelta(days=3), "3 days ago"),
+    ],
+)
+def test_last_run_says_how_long_ago(age, words):
+    created = (NOW - age).isoformat(timespec="seconds")
+    assert demo.last_run(created, NOW).startswith(f"last run {words} (")
+
+
+def test_last_run_matches_the_requested_format():
+    assert (
+        demo.last_run("2026-11-06T22:48:00+00:00", NOW)
+        == "last run 2 min ago (6 Nov 2026, 22:48 UTC)"
+    )
+
+
+def test_last_run_shows_the_time_in_utc():
+    assert demo.last_run("2026-11-07T00:48:00+02:00", NOW).endswith("(6 Nov 2026, 22:48 UTC)")
+
+
+def test_last_run_handles_a_clock_ahead_of_the_report():
+    assert demo.last_run("2026-11-06T22:51:00+00:00", NOW).startswith("last run just now")
+
+
+def test_last_run_keeps_an_unreadable_timestamp_visible():
+    assert demo.last_run("not a date", NOW) == "last run not a date"
+
+
+def _render_report(monkeypatch, data_source):
+    """Run the page against a fake API that has one monitoring report."""
+    from streamlit.testing.v1 import AppTest
+
+    report = {
+        "status": "ok",
+        "n_samples": 300,
+        "created_at": "2026-11-06T22:48:00+00:00",
+        "performance": {
+            "status": "ok",
+            "n_outcomes": 600,
+            "window_days": 30,
+            "actual": {"pr_auc": 0.8209, "precision_high": 0.9083},
+            "expected": {"pr_auc": 0.7874, "precision_high": 0.8324},
+        },
+    }
+    if data_source:
+        report["data_source"] = data_source
+    info = {
+        "model_version": "apex-test",
+        "trained_at": "2026-10-07T00:00:00+00:00",
+        "training_rows": 100,
+        "max_batch_size": 100,
+        "test_metrics": {"pr_auc": 0.7874, "precision_top20": 0.83, "recall_top20": 0.43},
+    }
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def urlopen(request, timeout):
+        body = report if request.full_url.endswith("/monitoring/latest") else info
+        return Response(json.dumps(body).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    at = AppTest.from_file(str(Path(__file__).parents[1] / "app" / "demo.py")).run()
+    assert not at.exception
+    return at
+
+
+def _captions(at) -> str:
+    return " | ".join(caption.value for caption in at.caption)
+
+
+def _delta_colors(at) -> set[int]:
+    return {m.proto.color for m in at.metric if "vs. test" in m.delta}
+
+
+def test_report_uses_the_new_heading_and_a_readable_time(monkeypatch):
+    at = _render_report(monkeypatch, None)
+    assert [s.value for s in at.subheader][0] == "Performance on recorded outcomes"
+    assert "(6 Nov 2026, 22:48 UTC)" in _captions(at)
+    assert "2026-11-06T22:48" not in _captions(at)
+
+
+def test_demo_data_gets_the_caption_and_neutral_deltas(monkeypatch):
+    from streamlit.proto.Metric_pb2 import Metric
+
+    at = _render_report(monkeypatch, "demo_seed")
+    assert (
+        "Synthetic demo outcomes are drawn from the model's own probabilities, so this is "
+        "higher than the real held-out test result (0.787). It is not evidence of quality."
+    ) in _captions(at)
+    assert _delta_colors(at) == {Metric.MetricColor.GRAY}
+
+
+def test_other_data_keeps_colored_deltas_and_no_demo_caption(monkeypatch):
+    from streamlit.proto.Metric_pb2 import Metric
+
+    at = _render_report(monkeypatch, None)
+    assert "Synthetic demo outcomes" not in _captions(at)
+    assert _delta_colors(at) == {Metric.MetricColor.GREEN}
 
 
 def _raise_http(code: int):
