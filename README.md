@@ -118,7 +118,7 @@ For every lead it returns:
 ## Dataset
 
 ### Primary: Lead Scoring Dataset (X Education)
-- Source: Kaggle, [`amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset) (saved as `data/raw/Leads.csv` by `make data-download`)
+- Source: Kaggle, [Lead Scoring Dataset (X Education), `amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset). The model was trained on this data
 - About 9,000 real leads from an online education company
 - Features: lead origin and source, website activity, demographics, engagement
 - Target: `Converted` (1 = converted, 0 = did not convert)
@@ -132,7 +132,7 @@ For every lead it returns:
 - Contains a well-known leakage feature (`duration`, the call length, only known after the call).
 - 45,211 clients, 11.7% subscribed. Results: [Second Dataset](#second-dataset-bank-marketing) and [docs/bank_marketing.md](docs/bank_marketing.md).
 
-> Raw data files are never committed to this repository. The one exception is [`deploy/demo_seed.json`](deploy/demo_seed.json): 600 test-set leads with only the 7 model input fields and the outcome, no IDs, for the [public demo](#demo-data).
+> **The data is not in this repository.** Kaggle lists the lead dataset's license as "Unknown", so none of its rows are redistributed here. To reproduce the results, download it yourself with `make data-download` (saved to `data/raw/`, which Git ignores; see [Getting Started](#getting-started)). The public demo uses [synthetic leads](#demo-data) instead.
 
 ## System Architecture
 
@@ -430,14 +430,14 @@ Without `DATABASE_URL`, everything runs on local SQLite, so development needs no
 
 ### Demo data
 
-So that visitors see a real monitoring report, a fresh demo database is filled once at startup (`SEED_DEMO_DATA=true`, set only on the Render API service; off by default):
+So that visitors see a working monitoring report, a fresh demo database is filled once at startup (`SEED_DEMO_DATA=true`, set only on the Render API service; off by default):
 
-- **Real rows:** 600 leads from the held-out test set, with their real outcomes, scored by the real model ([`deploy/demo_seed.json`](deploy/demo_seed.json)).
+- **Synthetic, not real:** 600 generated leads ([`deploy/demo_seed.json`](deploy/demo_seed.json)). Each input field is drawn from its training distribution, using only the saved model and its profile of shares and quantiles, and leads are selected so their scores follow the training score distribution. Each outcome is drawn from the model's predicted probability for that lead. No rows are copied, and `make demo-seed-file` regenerates the same file with a fixed seed, without the original dataset ([`synthetic.py`](src/apex/monitoring/synthetic.py)).
 - **Spread over time:** 300 predictions in the last 7 days, and 600 outcomes in the last 30 days, which passes the monitoring thresholds. Monitoring runs once afterwards, so `GET /monitoring/latest` has a report.
 - **Clearly marked:** the rows have `source = 'demo_seed'`. On the demo, monitoring reads only these rows (`MONITORING_SOURCE`), and the report says so. `make retrain` ignores them, so they can never decide whether a model is replaced.
 - **Idempotent:** new rows are added only when `predictions` is empty, so restarts add nothing.
 - **Kept fresh:** at most once a day, the demo rows get new timestamps and monitoring runs again, so they never age out of the monitoring windows. Only the timestamps of `demo_seed` rows change. The dates in the report therefore show how monitoring works, not when these leads arrived.
-- **Illustrative:** the final model was trained on all leads, including these. The demo's PR-AUC (about 0.81) is therefore slightly optimistic. It shows how monitoring works; the real evidence is in [Results](#results).
+- **Not evidence of model quality:** on these rows the report shows PR-AUC **0.821**, High-segment precision **91%**, and 41% conversion, with drift checks `ok`. Outcomes come from the model's own probabilities and the leads are built to resemble training data, so those numbers only show that monitoring works. **The model's real performance is the held-out test result: PR-AUC 0.787 and 83% precision in the top 20%** ([Results](#results)).
 
 ### Protecting the public demo
 
@@ -488,7 +488,7 @@ aurynix-apex/
 │   └── apex.db                    # local SQLite: predictions, outcomes, rejected requests, drift runs
 ├── deploy/                        # committed, for the Render image
 │   ├── models/                    # the model the demo serves (`make deploy-model`)
-│   └── demo_seed.json             # 600 test-set leads for the demo (`make demo-seed-file`)
+│   └── demo_seed.json             # 600 synthetic leads for the demo (`make demo-seed-file`)
 ├── docs/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
@@ -529,7 +529,8 @@ aurynix-apex/
 │       │   ├── drift.py           # PSI functions & statuses
 │       │   ├── monitor.py         # feature drift, prediction drift, data quality
 │       │   ├── simulate.py        # drift and outcomes demos
-│       │   └── seed.py            # demo data for a fresh public deployment
+│       │   ├── seed.py            # demo data for a fresh public deployment
+│       │   └── synthetic.py       # generates the demo's synthetic leads
 │       └── api/
 │           ├── app.py             # app, startup, /health
 │           ├── schemas.py         # request / response validation
@@ -645,7 +646,7 @@ Run `make help` for the full list.
 | | `make outcomes-demo` | Send real outcomes, then changed behavior; the performance check recommends retraining |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
 | Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build the image / start API + demo / stop |
-| Render | `make deploy-model` / `make demo-seed-file` | Copy the saved model to `deploy/models/` / rebuild `deploy/demo_seed.json` from the test split |
+| Render | `make deploy-model` / `make demo-seed-file` | Copy the saved model to `deploy/models/` / regenerate the synthetic `deploy/demo_seed.json` |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
 
 ## Configuration
@@ -709,7 +710,7 @@ Environment variables (see [`.env.example`](.env.example)):
 ### Later
 - [x] `outcomes` table and live performance tracking
 - [x] Apply the pipeline to the Bank Marketing dataset
-- [x] Public demo: Render + Neon Postgres, with marked demo data
+- [x] Public demo: Render + Neon Postgres, with marked synthetic demo data
 - [x] Public demo protection: API key, rate limit, batch limit, clean-up, fresh demo data
 - [ ] Integration with Aurynix Pulse
 

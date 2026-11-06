@@ -1,19 +1,15 @@
 """Demo data, so a fresh public deployment has a real monitoring report to show.
 
 With `SEED_DEMO_DATA=true`, API startup fills an empty database from deploy/demo_seed.json:
-real leads from the held-out test set with their real outcomes, scored by the saved
-model, with timestamps spread over the monitoring windows, then runs monitoring once.
+synthetic leads (apex.monitoring.synthetic), scored by the saved model, with timestamps
+spread over the monitoring windows, then runs monitoring once.
 The rows are marked `source = "demo_seed"`, and retraining ignores them. New rows are
 added only if `predictions` is empty, so restarts never add more. Once a day at most,
 the demo rows get fresh timestamps, so they stay inside the monitoring windows; nothing
 else about them changes, and other rows are not touched.
 
-    python -m apex.monitoring.seed   (or `make demo-seed-file`)
-
-rebuilds deploy/demo_seed.json from the test split. It holds only the 7 model input
-fields and the outcome: no IDs, no other columns. The final model was trained on all
-leads, so performance on these rows is in-sample and slightly optimistic: the demo shows
-how monitoring works, it is not new evidence of model quality.
+No real lead is stored in the repository. A report on these rows shows how monitoring
+works; it is not evidence of model quality.
 """
 
 import json
@@ -27,14 +23,12 @@ import pandas as pd
 
 from apex.api.database import insert_demo_rows, retime_demo_rows
 from apex.api.service import ScoringService
-from apex.config import load_config, path
-from apex.data.split import load_splits
+from apex.config import path
 from apex.models.segment import assign
 from apex.monitoring.monitor import Monitor
 
 logger = logging.getLogger("uvicorn.error")  # shown in the server log at INFO
 
-SEED_ROWS = 600
 # Half of the rows in each monitoring window (config.json: 7 days, 30 days), kept
 # inside the window edges. Outcomes arrive a day after the prediction.
 RECENT_DAYS = (0.1, 6.5)
@@ -126,26 +120,3 @@ def seed_on_startup(service: ScoringService, monitor: Monitor) -> None:
         return
     if saved:
         logger.info("Demo data: %s rows seeded.", saved)
-
-
-def build_seed_file(n: int = SEED_ROWS) -> list[dict[str, Any]]:
-    """Save `n` real test-set leads and their outcomes to deploy/demo_seed.json."""
-    cfg = load_config()
-    test = load_splits(include_test=True)["test"].sample(
-        n, random_state=cfg["split"]["random_state"]
-    )
-    fields = cfg["serving"]["input_fields"]
-    leads = test[fields].astype(object).where(test[fields].notna(), None).to_dict(orient="records")
-    rows = [
-        {"lead": lead, "converted": int(converted)}
-        for lead, converted in zip(leads, test[cfg["data"]["target"]], strict=True)
-    ]
-    file = path("demo_seed")
-    file.parent.mkdir(parents=True, exist_ok=True)
-    file.write_text(json.dumps(rows, indent=0) + "\n", encoding="utf-8")
-    print(f"saved {len(rows)} rows ({sum(r['converted'] for r in rows)} converted): {file}")
-    return rows
-
-
-if __name__ == "__main__":
-    build_seed_file()

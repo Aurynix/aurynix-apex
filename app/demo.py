@@ -192,7 +192,7 @@ def tab_monitoring() -> None:
     st.caption(f"{report['n_samples']:,} predictions · run at {report['created_at']}")
     if report.get("data_source"):
         st.caption(
-            "This public demo reports on its sample leads only, with timestamps kept recent, "
+            "This public demo reports on synthetic sample leads only, with recent timestamps, "
             "so leads you score here do not change it."
         )
     if report.get("retrain_recommended"):
