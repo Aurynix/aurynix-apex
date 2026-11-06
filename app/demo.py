@@ -65,7 +65,8 @@ def last_run(created_at: str, now: datetime | None = None) -> str:
     except ValueError:
         return f"last run {created_at}"
     now = now or datetime.now(UTC)
-    return f"last run {time_ago((now - when).total_seconds())} ({when.day} {when:%b %Y, %H:%M} {DISPLAY_TIMEZONE_NAME})"
+    shown = f"{when.day} {when:%b %Y, %H:%M} {DISPLAY_TIMEZONE_NAME}"
+    return f"last run {time_ago((now - when).total_seconds())} ({shown})"
 
 
 class ApiUnavailable(RuntimeError):
