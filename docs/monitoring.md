@@ -115,10 +115,12 @@ API:
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/outcomes` | Send real results: `{"outcomes": [{"prediction_id": 1042, "converted": true}]}` |
-| `POST` | `/monitoring/run?window_days=7` | Run the checks now and return the report |
+| `POST` | `/outcomes` 🔑 | Send real results: `{"outcomes": [{"prediction_id": 1042, "converted": true}]}` |
+| `POST` | `/monitoring/run?window_days=7` 🔑 | Run the checks now and return the report |
 | `GET` | `/monitoring/latest` | The latest report (404 if none yet) |
 | `GET` | `/monitoring/history?limit=30` | Status, sample size, score PSI, segment shares per run |
+
+🔑 Needs `X-API-Key` when `API_KEY` is set ([api.md](api.md)).
 
 ## Report (shortened)
 
@@ -150,7 +152,7 @@ API:
 
 ## Demo data
 
-On the public demo, monitoring includes the seeded rows (`source = 'demo_seed'`), so the report mixes them with visitors' leads. `make retrain` ignores them. Details: [README](../README.md#demo-data).
+On the public demo, `MONITORING_SOURCE=demo_seed` makes monitoring read only the seeded rows, so visitors' leads and rejected requests cannot change the report, and the report says so (`data_source`). Without the setting, every row counts. `make retrain` always ignores seeded rows. Details: [README](../README.md#demo-data).
 
 ## Not done (on purpose)
 

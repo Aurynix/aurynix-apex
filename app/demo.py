@@ -18,6 +18,7 @@ import pandas as pd
 import streamlit as st
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
+API_KEY = os.environ.get("API_KEY", "").strip()  # server side only: never shown to visitors
 # How long to wait for a sleeping API to wake up (free hosting). 0 = fail at once (local use).
 API_WAKE_SECONDS = float(os.environ.get("API_WAKE_SECONDS", "0"))
 WAKE_RETRY_SECONDS = 5
@@ -45,9 +46,10 @@ class ApiUnavailable(RuntimeError):
 def call(method: str, path: str, payload: dict | None = None) -> dict:
     """Call the API and return its JSON; raises RuntimeError with a readable message."""
     data = json.dumps(payload).encode() if payload is not None else None
-    request = urllib.request.Request(
-        f"{API_URL}{path}", data=data, method=method, headers={"content-type": "application/json"}
-    )
+    headers = {"content-type": "application/json"}
+    if API_KEY:
+        headers["X-API-Key"] = API_KEY
+    request = urllib.request.Request(f"{API_URL}{path}", data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             return json.load(response)
@@ -136,18 +138,28 @@ def tab_single() -> None:
         show_prediction(call("POST", "/predict/single", lead))
 
 
-def tab_batch() -> None:
+@st.cache_data(ttl=600, max_entries=20, show_spinner=False)
+def score_batch(leads: list[dict]) -> list[dict]:
+    """Score a batch once: Streamlit reruns the page on every click, and each scoring
+    would log the same leads again."""
+    return call("POST", "/predict/batch", {"leads": leads})["predictions"]
+
+
+def tab_batch(limit: int) -> None:
     st.caption(
         "Upload a CSV with the API fields (`lead_origin`, `lead_source`, `do_not_email`, "
         "`total_visits`, `time_on_website`, `specialization`, `occupation`) or the raw "
-        "Kaggle columns (e.g. `Leads.csv`). Up to 10,000 rows."
+        f"Kaggle columns (e.g. `Leads.csv`). Up to {limit:,} rows."
     )
     file = st.file_uploader("Leads CSV", type="csv")
     if not file:
         return
-    df = pd.read_csv(file).head(10_000)
+    df = pd.read_csv(file)
+    if len(df) > limit:
+        st.info(f"This demo scores the first {limit:,} of {len(df):,} rows.")
+        df = df.head(limit)
     leads = leads_from_csv(df)
-    result = call("POST", "/predict/batch", {"leads": leads})["predictions"]
+    result = score_batch(leads)
     ranked = pd.DataFrame(
         {
             "score": [p["score"] for p in result],
@@ -178,6 +190,11 @@ def tab_monitoring() -> None:
         return
     st.metric("Status", STATUS_ICON.get(report["status"], report["status"]))
     st.caption(f"{report['n_samples']:,} predictions · run at {report['created_at']}")
+    if report.get("data_source"):
+        st.caption(
+            "This public demo reports on synthetic sample leads only, with recent timestamps, "
+            "so leads you score here do not change it."
+        )
     if report.get("retrain_recommended"):
         st.error("Retraining recommended.")
 
@@ -254,7 +271,12 @@ def main() -> None:
     st.sidebar.caption(f"API: {API_URL}")
 
     single, batch, monitoring = st.tabs(["Score a lead", "Score a CSV", "Monitoring"])
-    for tab, render in [(single, tab_single), (batch, tab_batch), (monitoring, tab_monitoring)]:
+    tabs = [
+        (single, tab_single),
+        (batch, lambda: tab_batch(info["max_batch_size"])),
+        (monitoring, tab_monitoring),
+    ]
+    for tab, render in tabs:
         with tab:
             try:
                 render()

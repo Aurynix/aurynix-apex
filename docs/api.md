@@ -51,13 +51,17 @@ Routers do not know how the model works.
 | `GET` | `/health/db` | `{"status": "ok", "backend": "postgresql"}`, or `503` with `"status": "unavailable"`. Call it by hand, not from an uptime monitor |
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
-| `POST` | `/predict/batch` | Score up to 10,000 leads (results keep input order) |
-| `POST` | `/outcomes` | Send real results (converted or not) by `prediction_id` |
-| `POST` | `/monitoring/run` | Run monitoring now: drift, data quality, performance ([monitoring.md](monitoring.md)) |
+| `POST` | `/predict/batch` | Score up to `max_batch_size` leads (see `/model/info`; default 10,000, 100 on the public demo). More: `413`. Results keep input order |
+| `POST` | `/outcomes` 🔑 | Send real results (converted or not) by `prediction_id` |
+| `POST` | `/monitoring/run` 🔑 | Run monitoring now: drift, data quality, performance ([monitoring.md](monitoring.md)) |
 | `GET` | `/monitoring/latest` | Latest drift report |
 | `GET` | `/monitoring/history` | Status and key numbers of past runs |
 
 Reasons are part of every prediction, so a client never has to call a second endpoint to explain a score.
+
+🔑 Needs the `X-API-Key` header when `API_KEY` is set (`401` without the right key). With `DATABASE_URL` set but no `API_KEY`, the answer is always `503`. Locally, with neither set, these endpoints are open.
+
+With `RATE_LIMIT_PER_MINUTE` set, `/predict/*`, `/monitoring/*`, and `/health/db` answer `429` with a `Retry-After` header above that limit per client. A valid key is exempt. All settings: [README](../README.md#configuration).
 
 ## Lead (request)
 
@@ -152,6 +156,7 @@ Every prediction returns a `prediction_id`. When the real result is known, send 
 
 ```bash
 curl -X POST localhost:8000/outcomes -H 'content-type: application/json' \
+  -H "X-API-Key: $API_KEY" \
   -d '{"outcomes": [{"prediction_id": 1042, "converted": true}, {"prediction_id": 1043, "converted": false}]}'
 ```
 

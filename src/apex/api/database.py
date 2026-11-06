@@ -13,9 +13,9 @@ Tables are created on startup if they do not exist.
 import json
 import os
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,7 @@ from apex.config import path
 API_SOURCE = "api"
 DEMO_SOURCE = "demo_seed"
 _SETUP_LOCK_ID = 7203391  # Postgres advisory lock: one process at a time creates or seeds tables
+MAX_REJECTION_CHARS = 2_000
 
 metadata = MetaData()
 
@@ -262,6 +263,104 @@ def insert_demo_rows(
     return len(ids)
 
 
+def retime_demo_rows(
+    db: Database,
+    timestamps_for: Callable[[int], tuple[list[str], list[str]]],
+    stale_before: str,
+) -> int:
+    """Give demo rows new timestamps if the newest is older than `stale_before`.
+
+    Only rows with `source = 'demo_seed'` change, and only their timestamps. Returns
+    the number of rows changed (0 if there are none, or they are still fresh).
+    """
+    with db.transaction() as conn:
+        _take_setup_lock(conn)
+        demo = {"demo": DEMO_SOURCE}
+        newest = conn.execute(
+            text("SELECT MAX(created_at) FROM predictions WHERE source = :demo"), demo
+        ).scalar()
+        if newest is None or newest >= stale_before:
+            return 0
+        ids = list(
+            conn.execute(
+                text("SELECT id FROM predictions WHERE source = :demo ORDER BY id"), demo
+            ).scalars()
+        )
+        created, recorded = timestamps_for(len(ids))
+        conn.execute(
+            text("UPDATE predictions SET created_at = :created WHERE id = :id AND source = :demo"),
+            [{"id": i, "created": when, **demo} for i, when in zip(ids, created, strict=True)],
+        )
+        conn.execute(
+            text("UPDATE outcomes SET recorded_at = :recorded WHERE prediction_id = :id"),
+            [{"id": i, "recorded": when} for i, when in zip(ids, recorded, strict=True)],
+        )
+    return len(ids)
+
+
+def _delete_predictions(conn: Connection, condition: str, **params: Any) -> int:
+    """Delete the visitor predictions matching `condition`, and their outcomes."""
+    params["api"] = API_SOURCE
+    where = f"source = :api AND {condition}"
+    conn.execute(
+        text(
+            "DELETE FROM outcomes WHERE prediction_id IN "
+            f"(SELECT id FROM predictions WHERE {where})"
+        ),
+        params,
+    )
+    return conn.execute(text(f"DELETE FROM predictions WHERE {where}"), params).rowcount
+
+
+def purge_visitor_data(
+    db: Database, retention_days: int | None = None, max_rows: int | None = None
+) -> int:
+    """Delete old visitor data; demo rows are never touched. Returns predictions removed.
+
+    `retention_days`: delete visitor predictions, rejected requests, and monitoring
+    reports older than this, always keeping the latest report.
+    `max_rows`: keep at most this many of the newest visitor predictions and rejected
+    requests, so a burst of traffic cannot fill the database.
+    """
+    removed = 0
+    with db.transaction() as conn:
+        if retention_days:
+            cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat(
+                timespec="seconds"
+            )
+            removed += _delete_predictions(conn, "created_at < :cutoff", cutoff=cutoff)
+            conn.execute(
+                text("DELETE FROM rejected_requests WHERE created_at < :cutoff"), {"cutoff": cutoff}
+            )
+            conn.execute(
+                text(
+                    "DELETE FROM drift_runs WHERE created_at < :cutoff "
+                    "AND id <> (SELECT MAX(id) FROM drift_runs)"
+                ),
+                {"cutoff": cutoff},
+            )
+        if max_rows:
+            oldest_kept = conn.execute(
+                text(
+                    "SELECT id FROM predictions WHERE source = :api "
+                    "ORDER BY id DESC LIMIT 1 OFFSET :offset"
+                ),
+                {"api": API_SOURCE, "offset": max_rows - 1},
+            ).scalar()
+            if oldest_kept is not None:
+                removed += _delete_predictions(conn, "id < :keep", keep=oldest_kept)
+            oldest_rejection = conn.execute(
+                text("SELECT id FROM rejected_requests ORDER BY id DESC LIMIT 1 OFFSET :offset"),
+                {"offset": max_rows - 1},
+            ).scalar()
+            if oldest_rejection is not None:
+                conn.execute(
+                    text("DELETE FROM rejected_requests WHERE id < :keep"),
+                    {"keep": oldest_rejection},
+                )
+    return removed
+
+
 def record_outcomes(db: Database, outcomes: dict[int, bool]) -> list[int]:
     """Save {prediction_id: converted}. Returns unknown ids; if any, nothing is saved.
 
@@ -303,28 +402,51 @@ def read_outcome_leads(db: Database) -> list[tuple[dict, int]]:
     return [(json.loads(lead), converted) for lead, converted in rows]
 
 
-def read_outcomes(db: Database, since: str) -> list[tuple[float, str, int]]:
-    """(score, segment, converted) for outcomes recorded at or after `since`."""
+def read_outcomes(
+    db: Database, since: str, source: str | None = None
+) -> list[tuple[float, str, int]]:
+    """(score, segment, converted) for outcomes recorded at or after `since`.
+
+    With `source`, only outcomes of predictions from that source.
+    """
+    only_source = " AND p.source = :source" if source else ""
     return db.rows(
         "SELECT p.score, p.segment, o.converted FROM outcomes o "
-        "JOIN predictions p ON p.id = o.prediction_id WHERE o.recorded_at >= :since",
+        f"JOIN predictions p ON p.id = o.prediction_id WHERE o.recorded_at >= :since{only_source}",
         since=since,
+        source=source,
     )
 
 
 def log_rejection(db: Database, path: str, errors: list[dict]) -> None:
-    """Save a request the API refused as invalid."""
+    """Save a request the API refused as invalid.
+
+    The errors quote the request, so their size is limited: a huge invalid request
+    must not fill the database.
+    """
     with db.transaction() as conn:
         conn.execute(
             insert(rejected_requests),
-            {"created_at": now(), "path": path, "errors": json.dumps(errors, default=str)},
+            {
+                "created_at": now(),
+                "path": path[:MAX_REJECTION_CHARS],
+                "errors": json.dumps(errors, default=str)[:MAX_REJECTION_CHARS],
+            },
         )
 
 
-def read_predictions(db: Database, since: str) -> list[tuple[dict, float, str]]:
-    """(lead, score, segment) for every prediction logged at or after `since`."""
+def read_predictions(
+    db: Database, since: str, source: str | None = None
+) -> list[tuple[dict, float, str]]:
+    """(lead, score, segment) for every prediction logged at or after `since`.
+
+    With `source`, only predictions from that source.
+    """
+    only_source = " AND source = :source" if source else ""
     rows = db.rows(
-        "SELECT lead, score, segment FROM predictions WHERE created_at >= :since", since=since
+        f"SELECT lead, score, segment FROM predictions WHERE created_at >= :since{only_source}",
+        since=since,
+        source=source,
     )
     return [(json.loads(lead), score, segment) for lead, score, segment in rows]
 

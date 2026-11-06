@@ -95,16 +95,29 @@ If the image is not public, run `docker login ghcr.io` first, with a GitHub toke
 
 At startup the API creates its tables, and fills an empty database with [demo data](../README.md#demo-data) because `render.yaml` sets `SEED_DEMO_DATA=true`.
 
+Render generates `API_KEY` on the API service and copies it to the demo service. Other protection settings are explained in the [README](../README.md#protecting-the-public-demo). To call a protected endpoint yourself, copy the key from the service's **Environment** page; do not paste it anywhere else.
+
 **Check it:**
 
 ```bash
 API=https://aurynix-apex.onrender.com
 curl $API/health                    # {"status":"ok",...}: does not touch the database
 curl $API/health/db                 # {"status":"ok","backend":"postgresql"}
-curl $API/monitoring/latest         # a report with n_samples and performance
+curl $API/monitoring/latest         # a report with n_samples, performance, data_source
+curl -i -X POST $API/monitoring/run # 401: no key
 ```
 
 `/health/db` wakes the database, so call it by hand and do not point an uptime monitor at it.
+
+**Check the rate limit behind Cloudflare.** Fake address headers must not help: this should give about 30 `200` responses, then `429`:
+
+```bash
+for i in $(seq 1 35); do
+  curl -s -o /dev/null -w '%{http_code} ' -X POST $API/predict/single \
+    -H 'content-type: application/json' -H "CF-Connecting-IP: 10.0.0.$i" -H "X-Forwarded-For: 10.0.0.$i" \
+    -d '{"lead_origin":"API"}'
+done
+```
 
 ### Reset the demo data
 
@@ -117,7 +130,9 @@ DELETE FROM outcomes WHERE prediction_id IN (SELECT id FROM predictions WHERE so
 DELETE FROM predictions WHERE source = 'demo_seed';
 ```
 
-Start again with fresh timestamps, for example when the rows have aged out of the monitoring windows. This deletes **everything**, including visitors' predictions. Then restart the `aurynix-apex` service, and it seeds again because `predictions` is empty:
+To stop new rows coming back afterwards, also remove `SEED_DEMO_DATA` from the service. Timestamps do not need a reset: the API refreshes them at most once a day.
+
+Start again from nothing. This deletes **everything**, including visitors' predictions. Then restart the `aurynix-apex` service, and it seeds again because `predictions` is empty:
 
 ```sql
 TRUNCATE outcomes, predictions, rejected_requests, drift_runs RESTART IDENTITY;
@@ -135,11 +150,10 @@ Free services have nothing to mount, so the model is part of the image. After `m
 |---|---|
 | Sleeps after 15 minutes without traffic; waking takes about a minute | The demo and the API wake separately. The demo waits for the API (`API_WAKE_SECONDS`) and shows that it is starting |
 | No persistent disk on Render | Local files are wiped on restart or sleep, including `reports/monitoring/latest.json`. Data in Neon stays, and `GET /monitoring/latest` reads from it. Without `DATABASE_URL` the API falls back to SQLite, and that data is wiped too |
-| Neon storage and compute are limited | `/health` does not touch the database and the API keeps no idle connections, so Neon can scale to zero. The log grows by roughly 0.3 MB per 1,000 predictions (measured on SQLite), and anyone can send leads: check usage in the Neon dashboard |
-| Seeded rows age | After 7 days a new monitoring run sees only visitors' predictions, and may report `insufficient_data`; after 30 days the seeded outcomes leave the performance window too. See [Reset the demo data](#reset-the-demo-data) |
+| Neon storage and compute are limited | `/health` does not touch the database and the API keeps no idle connections, so Neon can scale to zero. Visitor rows are capped at 100,000 and removed after 30 days, every 5 minutes at most while there is traffic, and at each startup |
 | 750 free hours per month, shared across the workspace | Sleeping services use none, so do not keep the services awake with a pinger |
 | 512 MB RAM, 0.1 CPU per service | Enough, but slower. Measured locally in Docker with these limits and Postgres on the same machine: API ready in about 24 s including the first seed, a batch of 10,000 leads 35 s, API 213 MB after that batch |
-| Public URL, no login in the API | Use sample data only. Anyone can send leads and outcomes, and they now persist. Add authentication before real leads |
+| Public URL | Scoring is open on purpose, with limits, so use sample data only. Add authentication for every endpoint before real leads |
 
 ## Server sizing
 
