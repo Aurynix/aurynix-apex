@@ -25,7 +25,7 @@ import mlflow
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from apex.api.database import connect, read_outcome_leads
+from apex.api.database import connect, database_url, read_outcome_leads
 from apex.config import load_config, path
 from apex.data.load import load_raw
 from apex.models.evaluate import evaluate
@@ -36,8 +36,8 @@ def holdout(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame, str]:
     """(training rows for the challenger, held-out rows, where the held-out rows come from)."""
     target = cfg["data"]["target"]
     raw = load_raw()
-    db_file = path("database")
-    outcomes = read_outcome_leads(connect(db_file)) if db_file.exists() else []
+    url, db_file = database_url(), path("database")
+    outcomes = read_outcome_leads(connect(url or db_file)) if url or db_file.exists() else []
     if len(outcomes) >= cfg["monitoring"]["min_outcomes"]:
         leads = pd.DataFrame([lead for lead, _ in outcomes])
         leads[target] = [converted for _, converted in outcomes]

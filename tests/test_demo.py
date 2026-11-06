@@ -49,6 +49,27 @@ def test_demo_shows_an_error_when_the_api_is_down(monkeypatch):
     assert "Cannot reach the API" in at.error[0].value
 
 
+@pytest.mark.parametrize(("key", "sent"), [("secret", "secret"), ("", None)])
+def test_demo_sends_the_api_key_only_when_it_has_one(key, sent, monkeypatch):
+    seen = {}
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def urlopen(request, timeout):
+        seen["key"] = request.get_header("X-api-key")
+        return Response(b"{}")
+
+    monkeypatch.setattr(demo, "API_KEY", key)
+    monkeypatch.setattr(demo.urllib.request, "urlopen", urlopen)
+    demo.call("POST", "/monitoring/run")
+    assert seen["key"] == sent
+
+
 def _raise_http(code: int):
     def urlopen(request, timeout):
         raise urllib.error.HTTPError("http://api", code, "error", {}, io.BytesIO(b"detail"))

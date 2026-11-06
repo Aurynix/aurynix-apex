@@ -1,5 +1,4 @@
-# Free public demo on Render (docs/deployment.md). Sample data only: the API has no login,
-# and SQLite is wiped whenever a free service restarts or sleeps.
+# Free public demo on Render + Neon Postgres (docs/deployment.md). Sample data only.
 services:
   - type: web
     name: aurynix-apex
@@ -12,6 +11,24 @@ services:
     envVars:
       - key: PORT
         value: "8000"
+      - key: DATABASE_URL # secret: set by hand in the Render dashboard, never in this file
+        sync: false
+      - key: SEED_DEMO_DATA # fills an empty database and keeps demo rows fresh; API service only
+        value: "true"
+      - key: MONITORING_SOURCE # the report reads demo rows only, so visitors cannot change it
+        value: demo_seed
+      - key: API_KEY # Render creates it; required by /outcomes and /monitoring/run
+        generateValue: true
+      - key: RATE_LIMIT_PER_MINUTE # per client, for /predict/*, /monitoring/*, /health/db
+        value: "30"
+      - key: MAX_BATCH_SIZE
+        value: "100"
+      - key: VISITOR_RETENTION_DAYS
+        value: "30"
+      - key: MAX_VISITOR_ROWS # hard limit: the rate limit alone still allows ~4 million rows a day
+        value: "100000"
+      - key: TRUST_CF_CONNECTING_IP # Render is behind Cloudflare, which sets this header
+        value: "true"
 
   - type: web
     name: aurynix-apex-demo
@@ -28,3 +45,8 @@ services:
         value: https://aurynix-apex.onrender.com
       - key: API_WAKE_SECONDS # a sleeping API takes about a minute to wake
         value: "180"
+      - key: API_KEY # the same key as the API, so visitors can use the demo without it
+        fromService:
+          type: web
+          name: aurynix-apex
+          envVarKey: API_KEY

@@ -3,7 +3,7 @@
 > Stage 14 (step 4.4). Code: [`src/apex/monitoring/`](../src/apex/monitoring/). Settings: `config.json → monitoring`.
 
 ```bash
-make monitor      # check the last 7 days of API predictions (data/apex.db)
+make monitor      # check the last 7 days of API predictions (DATABASE_URL, or data/apex.db)
 make drift-demo   # simulate stable vs. drifted traffic and show the result
 ```
 
@@ -107,7 +107,7 @@ Only the outcomes catch this case. (The first scenario is in-sample, since the f
 
 | Place | Content |
 |---|---|
-| SQLite `drift_runs` (`data/apex.db`) | One row per run: time, sample size, status, score PSI, full report (JSON) |
+| Table `drift_runs` (Postgres or SQLite) | One row per run: time, sample size, status, score PSI, full report (JSON) |
 | `reports/monitoring/latest.json` | The latest report, for people |
 | `GET /monitoring/latest`, `/monitoring/history` | The same, through the API |
 
@@ -115,10 +115,12 @@ API:
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/outcomes` | Send real results: `{"outcomes": [{"prediction_id": 1042, "converted": true}]}` |
-| `POST` | `/monitoring/run?window_days=7` | Run the checks now and return the report |
+| `POST` | `/outcomes` 🔑 | Send real results: `{"outcomes": [{"prediction_id": 1042, "converted": true}]}` |
+| `POST` | `/monitoring/run?window_days=7` 🔑 | Run the checks now and return the report |
 | `GET` | `/monitoring/latest` | The latest report (404 if none yet) |
 | `GET` | `/monitoring/history?limit=30` | Status, sample size, score PSI, segment shares per run |
+
+🔑 Needs `X-API-Key` when `API_KEY` is set ([api.md](api.md)).
 
 ## Report (shortened)
 
@@ -147,6 +149,10 @@ API:
   }
 }
 ```
+
+## Demo data
+
+On the public demo, `MONITORING_SOURCE=demo_seed` makes monitoring read only the seeded rows, so visitors' leads and rejected requests cannot change the report, and the report says so (`data_source`). Without the setting, every row counts. `make retrain` always ignores seeded rows. Details: [README](../README.md#demo-data).
 
 ## Not done (on purpose)
 

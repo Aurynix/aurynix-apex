@@ -1,13 +1,14 @@
 """Drift monitoring endpoints: validate → monitor → response."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Security
 
 from apex.api.dependencies import MonitorDep
+from apex.api.security import api_key_scheme
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Security(api_key_scheme)])
 def run_monitoring(
     monitor: MonitorDep, window_days: int | None = Query(None, ge=1, le=365)
 ) -> dict:

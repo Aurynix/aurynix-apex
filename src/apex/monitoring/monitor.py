@@ -19,13 +19,17 @@ And, when real results have been sent to POST /outcomes:
 
 Drift and data quality need `min_samples` predictions, performance needs
 `min_outcomes` outcomes; with neither, the status is `insufficient_data`. Each run is
-saved in SQLite (`drift_runs`) and as reports/monitoring/latest.json.
+saved in the database (`drift_runs`) and as reports/monitoring/latest.json.
+
+With `MONITORING_SOURCE` set (the public demo: `demo_seed`), the checks read only rows
+from that source, so open traffic cannot change the report, and the report says so
+(`data_source`).
 
 Run `python -m apex.monitoring.monitor` (or `make monitor`).
 """
 
 import json
-import sqlite3
+import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -33,6 +37,7 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 
 from apex.api.database import (
+    Database,
     count_rejections,
     drift_runs,
     now,
@@ -50,26 +55,30 @@ class Monitor:
         self,
         model: Pipeline,
         profile: dict[str, Any],
-        db: sqlite3.Connection,
+        db: Database,
         config: dict[str, Any] | None = None,
         expected: dict[str, float] | None = None,
+        source: str | None = None,
     ):
         self.model, self.profile, self.db = model, profile, db
         self.cfg = config or load_config()
         self.expected = expected or {}  # test metrics saved with the model (model_meta.json)
+        self.source = source  # check only rows from this source (None: every row)
 
     def run(self, window_days: int | None = None, save: bool = True) -> dict[str, Any]:
         """Check the last `window_days` of predictions; save and return the report."""
         mon = self.cfg["monitoring"]
         days = window_days or mon["window_days"]
         since = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
-        rows = read_predictions(self.db, since)
+        rows = read_predictions(self.db, since, self.source)
         report: dict[str, Any] = {
             "created_at": now(),
             "window_days": days,
             "n_samples": len(rows),
             "model_version": self.profile["model_version"],
         }
+        if self.source:
+            report["data_source"] = self.source
         statuses = []
         if len(rows) >= mon["min_samples"]:
             leads = pd.DataFrame([r[0] for r in rows], columns=self.cfg["serving"]["input_fields"])
@@ -158,7 +167,8 @@ class Monitor:
             "warning" if v >= mon["unseen_share_warning"] else "ok" for v in unseen.values()
         ]
 
-        rejected = count_rejections(self.db, since)
+        # Rejected requests have no source: they all come from API traffic.
+        rejected = 0 if self.source else count_rejections(self.db, since)
         rejection_rate = rejected / (rejected + len(leads))
         statuses.append("warning" if rejection_rate >= mon["rejection_rate_warning"] else "ok")
         return {
@@ -176,7 +186,7 @@ class Monitor:
         days = mon["performance_window_days"]
         since = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
         rows = pd.DataFrame(
-            read_outcomes(self.db, since), columns=["score", "segment", "converted"]
+            read_outcomes(self.db, since, self.source), columns=["score", "segment", "converted"]
         )
         result: dict[str, Any] = {"window_days": days, "n_outcomes": len(rows)}
         if len(rows) < mon["min_outcomes"] or rows["converted"].nunique() < 2:
@@ -260,7 +270,7 @@ def summary(report: dict[str, Any]) -> str:
 
 
 def create_monitor(
-    db: sqlite3.Connection | None = None,
+    db: Database | None = None,
     model: Pipeline | None = None,
     meta: dict[str, Any] | None = None,
 ) -> Monitor:
@@ -274,7 +284,8 @@ def create_monitor(
     with (path("models_dir") / cfg["files"]["reference_profile"]).open(encoding="utf-8") as f:
         profile = json.load(f)
     expected = meta["performance"]["test"]
-    return Monitor(model, profile, db or connect(path("database")), cfg, expected)
+    source = os.environ.get("MONITORING_SOURCE", "").strip() or None
+    return Monitor(model, profile, db or connect(), cfg, expected, source)
 
 
 if __name__ == "__main__":

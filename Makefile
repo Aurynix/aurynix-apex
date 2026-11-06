@@ -1,9 +1,11 @@
 .DEFAULT_GOAL := help
 .PHONY: help venv install lock data-download data-info leakage eda features split baselines evaluate calibration segments explain time-split retrain train cv tune predict pipeline run run-prod demo \
-        monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down deploy-model lint format test clean
+        monitor drift-demo outcomes-demo mlflow-ui docker-build docker-up docker-down deploy-model demo-seed-file lint format test clean
 
 # All commands run inside the uv-managed .venv (requires https://docs.astral.sh/uv/)
 RUN := uv run
+# Commands that use the API database also read .env (DATABASE_URL), if the file exists
+RUN_ENV := uv run $(if $(wildcard .env),--env-file .env)
 API_PORT ?= 8000
 DEMO_PORT ?= 8501
 export MLFLOW_DISABLE_AGENT_HINT := 1
@@ -60,7 +62,7 @@ time-split: ## Train on older rows, test on newer (date-ordered data only, e.g. 
 	$(RUN) python -m apex.models.train time-split
 
 retrain: ## Train a new model; replace the saved one only if it is at least as good (old one archived)
-	$(RUN) python -m apex.models.retrain
+	$(RUN_ENV) python -m apex.models.retrain
 
 train: ## Fit the final model on all leads; save model, meta, reference profile, model card
 	$(RUN) python -m apex.models.train final
@@ -78,18 +80,18 @@ pipeline: split train predict ## Leads.csv → split → final model + artifacts
 
 # ---------- Serving ----------
 run: ## Start the API (dev, auto-reload) → http://localhost:8000/docs (needs `make train`; API_PORT=… to change)
-	$(RUN) uvicorn apex.api.app:app --reload --port $(API_PORT)
+	$(RUN_ENV) uvicorn apex.api.app:app --reload --port $(API_PORT)
 
 run-prod: ## Start the API (prod, 2 workers)
-	$(RUN) uvicorn apex.api.app:app --host 0.0.0.0 --port $(API_PORT) --workers 2
+	$(RUN_ENV) uvicorn apex.api.app:app --host 0.0.0.0 --port $(API_PORT) --workers 2
 
 demo: ## Start the Streamlit demo → http://localhost:8501 (needs the API: `make run`)
 	API_URL=http://localhost:$(API_PORT) $(RUN) streamlit run app/demo.py --server.port $(DEMO_PORT) \
 		--server.headless true --browser.gatherUsageStats false
 
 # ---------- Monitoring ----------
-monitor: ## Drift monitoring on the last 7 days of API predictions (data/apex.db)
-	$(RUN) python -m apex.monitoring.monitor
+monitor: ## Drift monitoring on the last 7 days of API predictions (DATABASE_URL or data/apex.db)
+	$(RUN_ENV) python -m apex.monitoring.monitor
 
 drift-demo: ## Simulate stable vs. drifted traffic and show that the monitor flags only the drift
 	$(RUN) python -m apex.monitoring.simulate
@@ -115,6 +117,9 @@ deploy-model: ## Copy the saved model to deploy/models/ for the Render image (co
 	@test -f models/model.pkl || (echo "models/model.pkl not found: run \`make train\` first." && exit 1)
 	mkdir -p deploy/models
 	cp models/model.pkl models/model_meta.json models/reference_profile.json deploy/models/
+
+demo-seed-file: ## Regenerate the synthetic deploy/demo_seed.json (fixed seed, no dataset needed; commit the result)
+	$(RUN) python -m apex.monitoring.synthetic
 
 # ---------- Quality ----------
 lint: ## Lint with Ruff

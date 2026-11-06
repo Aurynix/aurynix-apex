@@ -23,11 +23,40 @@ def client(service, monitor):
 
 
 def logged(service) -> int:
-    return service.db.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+    return service.db.scalar("SELECT COUNT(*) FROM predictions")
 
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok", "model_version": "apex-test"}
+
+
+def test_health_does_not_touch_the_database(client, service, monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("/health must not open a database connection")
+
+    monkeypatch.setattr(service.db.engine, "connect", fail)
+    assert client.get("/health").status_code == 200
+
+
+def test_health_db_reports_the_backend(client, service):
+    assert client.get("/health/db").json() == {"status": "ok", "backend": service.db.backend}
+
+
+def test_health_db_answers_503_when_the_database_is_down(client, service, monkeypatch):
+    def down():
+        raise OSError("connection refused: secret-host")
+
+    monkeypatch.setattr(service.db, "ping", down)
+    response = client.get("/health/db")
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable", "backend": service.db.backend}
+
+
+def test_home_redirects_to_the_docs_and_is_not_in_the_schema(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert response.headers["location"] == "/docs"
+    assert "/" not in client.get("/openapi.json").json()["paths"]
 
 
 def test_model_info(client, service):
@@ -91,7 +120,7 @@ def test_no_time_on_site_means_zero_visits():
 
 def test_invalid_requests_are_logged_for_monitoring(client, service):
     client.post("/predict/single", json={**LEAD, "total_visits": -1})
-    assert service.db.execute("SELECT COUNT(*) FROM rejected_requests").fetchone()[0] == 1
+    assert service.db.scalar("SELECT COUNT(*) FROM rejected_requests") == 1
 
 
 def test_monitoring_endpoints(client):
@@ -112,7 +141,7 @@ def test_outcomes_are_saved_by_prediction_id(client, service):
     assert client.post("/outcomes", json=payload).json() == {"saved": 1}
     payload["outcomes"][0]["converted"] = False  # sending again replaces the outcome
     client.post("/outcomes", json=payload)
-    assert service.db.execute("SELECT converted FROM outcomes").fetchall() == [(0,)]
+    assert service.db.rows("SELECT converted FROM outcomes") == [(0,)]
 
 
 def test_unknown_prediction_ids_save_nothing(client, service):
@@ -126,7 +155,7 @@ def test_unknown_prediction_ids_save_nothing(client, service):
     response = client.post("/outcomes", json=payload)
     assert response.status_code == 404
     assert response.json()["detail"]["unknown"] == [999]
-    assert service.db.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == 0
+    assert service.db.scalar("SELECT COUNT(*) FROM outcomes") == 0
 
 
 def test_api_reports_the_software_version(client):
@@ -148,4 +177,30 @@ def test_parallel_scoring_shares_one_database_connection_safely(trained, tmp_pat
     with ThreadPoolExecutor(20) as pool:
         results = list(pool.map(lambda _: service.score([row])[0]["prediction_id"], range(100)))
     assert len(set(results)) == 100
-    assert service.db.execute("SELECT COUNT(*) FROM predictions").fetchone()[0] == 100
+    assert service.db.scalar("SELECT COUNT(*) FROM predictions") == 100
+
+
+def test_parallel_scoring_on_the_test_database(service):
+    """The same, on the `db` fixture: Postgres when TEST_DATABASE_URL is set."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    row = Lead(**LEAD).to_row()
+    with ThreadPoolExecutor(10) as pool:
+        results = list(pool.map(lambda _: service.score([row])[0]["prediction_id"], range(50)))
+    assert len(set(results)) == 50
+    assert service.db.scalar("SELECT COUNT(*) FROM predictions") == 50
+
+
+def test_batch_ids_match_their_leads(service):
+    """Ids must come back in input order, or outcomes would attach to the wrong leads."""
+    import json
+
+    rows = [{**Lead(**LEAD).to_row(), "TotalVisits": i} for i in range(1, 501)]
+    results = service.score(rows)
+    stored = dict(service.db.rows("SELECT id, lead FROM predictions"))
+    assert [json.loads(stored[r["prediction_id"]])["TotalVisits"] for r in results] == list(
+        range(1, 501)
+    )
+    assert results[0]["score"] == service.db.scalar(
+        "SELECT score FROM predictions WHERE id = :id", id=results[0]["prediction_id"]
+    )

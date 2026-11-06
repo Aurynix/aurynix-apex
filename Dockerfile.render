@@ -1,6 +1,6 @@
 # Image for the free Render demo (render.yaml). Same as Dockerfile, with two differences:
-# the model is inside the image (deploy/models, `make deploy-model`), because Render has
-# nothing to mount on the free plan, and there are no build cache mounts.
+# the model and demo data are inside the image (deploy/), because Render has nothing to
+# mount on the free plan, and there are no build cache mounts.
 FROM python:3.11-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /uvx /bin/
@@ -27,6 +27,7 @@ COPY README.md config.json ./
 COPY src ./src
 COPY app ./app
 COPY deploy/models ./models
+COPY deploy/demo_seed.json ./deploy/demo_seed.json
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000 8501

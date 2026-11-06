@@ -46,7 +46,7 @@ Ports come from `.env` (copy `.env.example`) or the environment: `API_PORT=8020 
 | `demo` | `apex-demo` | `streamlit run app/demo.py`, talks to `http://api:8000` | `${DEMO_PORT:-8501}` → 8501 |
 
 - **The model is not inside the image.** `./models` is mounted read-only, so a new `make train` on the host is picked up by restarting the API (`docker compose restart api`), with no rebuild.
-- `./data` is mounted for the SQLite log (`data/apex.db`), `./reports` for monitoring reports.
+- `./data` is mounted for the local SQLite log (`data/apex.db`), `./reports` for monitoring reports. If `DATABASE_URL` is set in `.env`, the API uses Postgres instead.
 - The API has a health check (`/health`); the demo starts only when the API is healthy.
 - `make docker-up` stops early with a clear message if `models/model.pkl` does not exist.
 
@@ -83,21 +83,77 @@ docker run -p 8000:8000 -v ./models:/app/models:ro -v ./data:/app/data ghcr.io/a
 
 If the image is not public, run `docker login ghcr.io` first, with a GitHub token that has `read:packages`.
 
-## Free demo on Render
+## Free demo on Render + Neon
 
-[`render.yaml`](../render.yaml) creates two free web services from [`Dockerfile.render`](../Dockerfile.render): `aurynix-apex` (API) and `aurynix-apex-demo` (Streamlit). This is a public demo for sample data, not a production setup.
+[`render.yaml`](../render.yaml) creates two free web services from [`Dockerfile.render`](../Dockerfile.render): `aurynix-apex` (API) and `aurynix-apex-demo` (Streamlit). Their data lives in a free [Neon](https://neon.tech) Postgres database. This is a public demo for sample data, not a production setup.
 
-**Deploy:** merge to `main`, then in Render choose **New → Blueprint**, select this repository, and click **Apply**. If the API's URL is not `https://aurynix-apex.onrender.com`, update `API_URL` on the demo service.
+**First deployment:**
 
-**New model:** free services have nothing to mount, so the model is part of the image. After `make train` or `make retrain`, run `make deploy-model`, commit `deploy/models/`, and merge to `main`. Do not commit a model trained on private data: this repository is public.
+1. In Neon, create a project in the same region as the services (Oregon: AWS US West 2) and copy its connection string.
+2. In Render, choose **New → Blueprint**, select this repository, and click **Apply**. If the API's URL is not `https://aurynix-apex.onrender.com`, update `API_URL` on the demo service.
+3. Set `DATABASE_URL` on the `aurynix-apex` service, under **Environment**. Render asks for it when a Blueprint is first created, but ignores `sync: false` variables on later updates, so an existing service needs it added by hand. Never put the value in this repository.
+
+At startup the API creates its tables, and fills an empty database with [demo data](../README.md#demo-data) because `render.yaml` sets `SEED_DEMO_DATA=true`.
+
+Render generates `API_KEY` on the API service and copies it to the demo service. Other protection settings are explained in the [README](../README.md#protecting-the-public-demo). To call a protected endpoint yourself, copy the key from the service's **Environment** page; do not paste it anywhere else.
+
+**Check it:**
+
+```bash
+API=https://aurynix-apex.onrender.com
+curl $API/health                    # {"status":"ok",...}: does not touch the database
+curl $API/health/db                 # {"status":"ok","backend":"postgresql"}
+curl $API/monitoring/latest         # a report with n_samples, performance, data_source
+curl -i -X POST $API/monitoring/run # 401: no key
+```
+
+`/health/db` wakes the database, so call it by hand and do not point an uptime monitor at it.
+
+**Check the rate limit behind Cloudflare.** Fake address headers must not help: this should give about 30 `200` responses, then `429`:
+
+```bash
+for i in $(seq 1 35); do
+  curl -s -o /dev/null -w '%{http_code} ' -X POST $API/predict/single \
+    -H 'content-type: application/json' -H "CF-Connecting-IP: 10.0.0.$i" -H "X-Forwarded-For: 10.0.0.$i" \
+    -d '{"lead_origin":"API"}'
+done
+```
+
+### Reset the demo data
+
+Run these in Neon's SQL editor.
+
+Remove only the demo rows (monitoring reports stay in `drift_runs`):
+
+```sql
+DELETE FROM outcomes WHERE prediction_id IN (SELECT id FROM predictions WHERE source = 'demo_seed');
+DELETE FROM predictions WHERE source = 'demo_seed';
+```
+
+To stop new rows coming back afterwards, also remove `SEED_DEMO_DATA` from the service. Timestamps do not need a reset: the API refreshes them at most once a day.
+
+Start again from nothing. This deletes **everything**, including visitors' predictions. Then restart the `aurynix-apex` service, and it seeds again because `predictions` is empty:
+
+```sql
+TRUNCATE outcomes, predictions, rejected_requests, drift_runs RESTART IDENTITY;
+```
+
+Regenerate the synthetic rows with `make demo-seed-file` (fixed seed, no dataset needed), and commit `deploy/demo_seed.json`.
+
+### New model
+
+Free services have nothing to mount, so the model is part of the image. After `make train` or `make retrain`, run `make deploy-model` and `make demo-seed-file`, commit `deploy/`, and merge to `main`. The demo rows depend on the model, and a test checks that they match. Do not commit a model trained on private data: this repository is public.
+
+### Free plan limits
 
 | Free plan limit | Effect on Apex |
 |---|---|
 | Sleeps after 15 minutes without traffic; waking takes about a minute | The demo and the API wake separately. The demo waits for the API (`API_WAKE_SECONDS`) and shows that it is starting |
-| No persistent disk | `data/apex.db` is wiped on restart or sleep. To show monitoring, score at least 200 leads, then run monitoring before the service sleeps |
+| No persistent disk on Render | Local files are wiped on restart or sleep, including `reports/monitoring/latest.json`. Data in Neon stays, and `GET /monitoring/latest` reads from it. Without `DATABASE_URL` the API falls back to SQLite, and that data is wiped too |
+| Neon storage and compute are limited | `/health` does not touch the database and the API keeps no idle connections, so Neon can scale to zero. Visitor rows are capped at 100,000 and removed after 30 days, every 5 minutes at most while there is traffic, and at each startup |
 | 750 free hours per month, shared across the workspace | Sleeping services use none, so do not keep the services awake with a pinger |
-| 512 MB RAM, 0.1 CPU per service | Enough, but slower. Measured locally in Docker with these limits: API ready in 16 s, API 184 MB and demo 51 MB after the tests, one lead 0.5 s, a batch of 10,000 leads 25 s |
-| Public URL, no login in the API | Use sample data only. Add authentication and a disk (a paid plan) before real leads |
+| 512 MB RAM, 0.1 CPU per service | Enough, but slower. Measured locally in Docker with these limits and Postgres on the same machine: API ready in about 24 s including the first seed, a batch of 10,000 leads 35 s, API 213 MB after that batch |
+| Public URL | Scoring is open on purpose, with limits, so use sample data only. Add authentication for every endpoint before real leads |
 
 ## Server sizing
 
@@ -120,6 +176,6 @@ Measured on the Docker stack (`make docker-up`, model trained on the lead data) 
 | Comfortable (room for OS, Docker, updates, a second API worker) | **2 GB** | 2 vCPU | 20 GB |
 
 - Each extra API worker (`make run-prod` uses 2) adds about 240 MB.
-- Disk grows with the prediction log (`data/apex.db`): about 0.3 MB per 1,000 predictions.
+- Disk grows with the prediction log (`data/apex.db`, or Postgres): about 0.3 MB per 1,000 predictions on SQLite.
 - One worker handles about 20 single predictions per second, or thousands per second in batches, far above a typical lead volume.
 

@@ -14,6 +14,8 @@ Short records of decisions that shape the model and the system. Newest last.
 | [008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check) | Real outcomes by prediction id and a performance check | 5 |
 | [009](#adr-009-one-pipeline-one-config-per-dataset) | One pipeline, one config per dataset | 6 |
 | [010](#adr-010-safe-retraining-champion-vs-challenger) | Safe retraining: champion vs. challenger | — |
+| [011](#adr-011-postgres-through-database_url-with-marked-demo-data) | Postgres through `DATABASE_URL`, with marked demo data | — |
+| [012](#adr-012-protect-the-public-demo-with-settings-not-accounts) | Protect the public demo with settings, not accounts | — |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -181,3 +183,30 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 
 **Consequences.** Retraining stays a manual, deliberate step (ADR-006): no automatic schedule, no API endpoint. Restart the API to serve a promoted model. Rolling back = copying an archive folder back into `models/`.
 
+---
+
+## ADR-011: Postgres through `DATABASE_URL`, with marked demo data
+
+- **Date:** 2026-11-06 · **Status:** Accepted
+
+**Context.** The free public demo runs on Render, which wipes local files when a service sleeps or restarts. SQLite data therefore disappeared, and monitoring always showed `insufficient_data` to visitors. A persistent disk needs a paid plan.
+
+**Decision.** Use SQLAlchemy Core with psycopg 3. `DATABASE_URL` selects Postgres (Neon Free in the demo); without it, Apex uses local SQLite. Tables are created on startup, with no Alembic: the one schema change so far (`predictions.source`) is a small check at startup. Postgres connections are opened per use, none are kept idle, and `/health` never touches the database, so Neon can scale to zero. With `SEED_DEMO_DATA=true`, an empty database is filled once with 600 synthetic leads and outcomes, marked `source = 'demo_seed'`, then monitoring runs once. The rows ship in `deploy/demo_seed.json`, because the image has no dataset. Kaggle lists the dataset's license as "Unknown", so no real rows are redistributed: `make demo-seed-file` generates the file with a fixed seed from the saved model and profile alone. Fields are drawn from their training distributions, leads are selected so scores follow the training score distribution (independent fields alone gave a score PSI of about 0.2 and a false drift warning), and outcomes are drawn from the model's probabilities.
+
+**Why.** It keeps data at no cost, and local development and tests still need no database server. Marking the rows keeps them easy to filter and delete. `make retrain` ignores them: their outcomes come from the current model, so they would always favor it.
+
+**Consequences.** A new connection per use adds some delay per request, which is fine for a demo but should be revisited for real traffic. The monitoring report on the demo only shows that monitoring works: PR-AUC 0.821 on these rows is not evidence of quality, and the real result stays the test PR-AUC of 0.787. Seeded rows age out of the monitoring windows (7 and 30 days); ADR-012 keeps them fresh. The demo database is open to anyone until the API has authentication; ADR-012 limits that.
+
+---
+
+## ADR-012: Protect the public demo with settings, not accounts
+
+- **Date:** 2026-11-06 · **Status:** Accepted
+
+**Context.** With persistent data (ADR-011), misuse would last: fake outcomes could ruin the monitoring report, a script could fill Neon's 1 GB, and the seeded rows would age out of the monitoring windows within a week. A test also showed that an API key on `/outcomes` is not enough: 132 leads sent through the open `/predict` turned the report to `drift` and "retraining recommended".
+
+**Decision.** Optional environment variables, all off for local use. `X-API-Key` guards `POST /outcomes` and `POST /monitoring/run`, and a persistent database without a key refuses those requests. A per-client rate limit and a smaller batch limit cover open traffic. Visitor rows are deleted by age and capped by count. `MONITORING_SOURCE=demo_seed` makes the demo's report read only demo rows. Demo rows get fresh timestamps at most once a day, and only `demo_seed` rows change.
+
+**Why.** Visitors can still try scoring without an account, which is the point of a demo. The checks run in middleware, before the body is parsed, so refused requests cost almost nothing and log nothing. The row cap is the real storage limit: 30 requests a minute × 100 leads is still about 4 million rows a day. The client address comes from `CF-Connecting-IP`, because `X-Forwarded-For` keeps what the client sent. No new dependency is needed.
+
+**Consequences.** The demo's report describes synthetic leads with refreshed dates, and not visitors' traffic; the report and the page say so. Limits are per process and reset on restart, which is enough for one small worker. Many addresses working together could still push out other visitors' rows, but cannot reach the demo rows or exceed the cap by much. The Streamlit demo's key is exempt from the rate limit, so its traffic relies on the batch limit and the cap. Real customers would need real authentication on every endpoint.

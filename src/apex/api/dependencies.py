@@ -10,7 +10,6 @@ from fastapi import Depends, Request
 
 from apex.api.database import connect
 from apex.api.service import ScoringService
-from apex.config import path
 from apex.models.predict import load_model
 from apex.monitoring.monitor import Monitor, create_monitor
 
@@ -18,7 +17,7 @@ from apex.monitoring.monitor import Monitor, create_monitor
 def create_service() -> ScoringService:
     """Load the saved model and metadata, open the database, build the service."""
     model, meta = load_model()
-    return ScoringService(model, meta, connect(path("database")))
+    return ScoringService(model, meta, connect())
 
 
 def get_service(request: Request) -> ScoringService:

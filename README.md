@@ -19,10 +19,22 @@ It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-puls
 
 > ✅ **v0.2.0.** All build steps are done ([BUILD_STEPS.md](BUILD_STEPS.md)); changes per version in [CHANGELOG.md](CHANGELOG.md). On a held-out test set, the top 20% of scored leads hold **43%** of all buyers, and **83%** of calls in that group reach a buyer (random: 38%). See [Results](#results).
 
+## Live Demo
+
+| | Link |
+|---|---|
+| **Try it:** score a lead or a CSV, see monitoring | [aurynix-apex-demo.onrender.com](https://aurynix-apex-demo.onrender.com) |
+| **API docs:** call every endpoint from the browser | [aurynix-apex.onrender.com/docs](https://aurynix-apex.onrender.com/docs) |
+
+> ⏳ **The first visit can take up to 2 minutes.** The demo runs on free hosting, where services sleep after 15 minutes without traffic. The page waits while they wake up; if it shows an error, refresh it.
+
+> 🧪 **Sample data only.** Scoring is open to try, so do not send real customer data. How it is hosted, protected, and what the demo data is: [Deployment](#deployment).
+
 ---
 
 ## Table of Contents
 
+- [Live Demo](#live-demo)
 - [The Problem](#the-problem)
 - [The Solution](#the-solution)
 - [How It Fits Into Aurynix Pulse](#how-it-fits-into-aurynix-pulse)
@@ -37,6 +49,7 @@ It is the scoring engine behind **[Aurynix Pulse](#how-it-fits-into-aurynix-puls
 - [Explainability](#explainability)
 - [API](#api)
 - [Monitoring: Data Drift & Score Drift](#monitoring-data-drift--score-drift)
+- [Deployment](#deployment)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
@@ -105,7 +118,7 @@ For every lead it returns:
 ## Dataset
 
 ### Primary: Lead Scoring Dataset (X Education)
-- Source: Kaggle, [`amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset) (saved as `data/raw/Leads.csv` by `make data-download`)
+- Source: Kaggle, [Lead Scoring Dataset (X Education), `amritachatterjee09/lead-scoring-dataset`](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset). The model was trained on this data
 - About 9,000 real leads from an online education company
 - Features: lead origin and source, website activity, demographics, engagement
 - Target: `Converted` (1 = converted, 0 = did not convert)
@@ -119,7 +132,7 @@ For every lead it returns:
 - Contains a well-known leakage feature (`duration`, the call length, only known after the call).
 - 45,211 clients, 11.7% subscribed. Results: [Second Dataset](#second-dataset-bank-marketing) and [docs/bank_marketing.md](docs/bank_marketing.md).
 
-> Raw data is never committed to this repository.
+> **The data is not in this repository.** Kaggle lists the lead dataset's license as "Unknown", so none of its rows are redistributed here. To reproduce the results, download it yourself with `make data-download` (saved to `data/raw/`, which Git ignores; see [Getting Started](#getting-started)). The public demo uses [synthetic leads](#demo-data) instead.
 
 ## System Architecture
 
@@ -134,12 +147,13 @@ For every lead it returns:
  Client / Pulse ──▶ FastAPI routers ──▶ ScoringService: score ─▶ segment ─▶ explain ─▶ log
  Streamlit demo ──▶  (validate only)                                                 │
                                                                                       ▼
-                     SQLite (data/apex.db): predictions · rejected_requests ──▶ Monitor
+                     Postgres (DATABASE_URL) or SQLite (data/apex.db):
+                     predictions · outcomes · rejected_requests ──────────────▶ Monitor
                                                                                   │
                                          drift_runs · reports/monitoring/latest.json ◀┘
 ```
 
-Training and serving are separate: the API only loads the saved model and never trains ([ADR-006](docs/decisions.md)).
+Training and serving are separate: the API only loads the saved model and never trains ([ADR-006](docs/decisions.md)). The live setup is described in [Deployment](#deployment).
 
 ## ML Pipeline
 
@@ -285,14 +299,18 @@ make run     # → http://localhost:8000/docs
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness check and loaded model version |
+| `GET` | `/` | Redirects to `/docs` |
+| `GET` | `/health` | Liveness check and loaded model version; never touches the database |
+| `GET` | `/health/db` | Database check: `ok` or `503`, and which database is in use |
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
-| `POST` | `/predict/batch` | Score a list of leads (up to 10,000) |
-| `POST` | `/outcomes` | Send real results (converted or not) by `prediction_id` |
-| `POST` | `/monitoring/run` | Run monitoring now (drift, data quality, performance) |
+| `POST` | `/predict/batch` | Score a list of leads (up to 10,000; 100 on the public demo) |
+| `POST` | `/outcomes` 🔑 | Send real results (converted or not) by `prediction_id` |
+| `POST` | `/monitoring/run` 🔑 | Run monitoring now (drift, data quality, performance) |
 | `GET` | `/monitoring/latest` | Latest drift report |
 | `GET` | `/monitoring/history` | Status and score drift over time |
+
+🔑 Needs the `X-API-Key` header when `API_KEY` is set on the server ([protection](#protecting-the-public-demo)).
 
 **Response of `/predict/single`** (reasons are always included, so there is no separate explain call):
 
@@ -313,7 +331,7 @@ make run     # → http://localhost:8000/docs
 }
 ```
 
-Every scored lead is logged to SQLite (`data/apex.db`, table `predictions`) for monitoring. Later, send the real result with its `prediction_id` to `POST /outcomes`.
+Every scored lead is logged to the database (table `predictions`) for monitoring. Later, send the real result with its `prediction_id` to `POST /outcomes`.
 
 ## Monitoring: Data Drift & Score Drift
 
@@ -367,11 +385,13 @@ And with real results (`make outcomes-demo`): 2,000 leads with their true outcom
 | High precision (expected 83%) | 86% | **64%** |
 | Performance | 🟢 ok | 🔴 drift → **retraining recommended** |
 
-### Storage (SQLite, `data/apex.db`)
+### Storage
+
+Postgres when `DATABASE_URL` is set, otherwise SQLite (`data/apex.db`). Tables are created on startup if they do not exist.
 
 | Table | One row per | Key columns |
 |---|---|---|
-| `predictions` | Scored lead | created_at, model_version, lead (JSON), score, segment |
+| `predictions` | Scored lead | created_at, model_version, lead (JSON), score, segment, source (`api` or `demo_seed`) |
 | `rejected_requests` | Invalid request (422) | created_at, path, errors |
 | `drift_runs` | Monitoring run | created_at, n_samples, status, score_psi, full report (JSON) |
 | `outcomes` | Real result of a scored lead | prediction_id, converted, recorded_at |
@@ -388,6 +408,56 @@ API: `POST /outcomes` (send real results by `prediction_id`), `POST /monitoring/
 
 Drift shows that the **data** changed; outcomes show whether the model is still **right**. Outcomes mostly arrive for leads that were called (often High), so performance can lean toward the model's own choices; see [ADR-008](docs/decisions.md).
 
+## Deployment
+
+The public demo runs at no cost on [Render](https://render.com) and [Neon](https://neon.tech). Full steps and limits: [docs/deployment.md](docs/deployment.md).
+
+```
+ Browser ──▶ Streamlit demo ──HTTP──▶ FastAPI + model ──▶ Neon Postgres
+             Render Free              Render Free         Free, data persists
+             (no data of its own)     (model in the image)
+```
+
+| Part | Where | Why |
+|---|---|---|
+| API and demo | Two Render Free web services, from [`render.yaml`](render.yaml) and [`Dockerfile.render`](Dockerfile.render) | Free, and deployed from `main` on every merge |
+| Model | Inside the image ([`deploy/models/`](deploy/models/)) | Free services have nothing to mount, and the API only reads it |
+| Predictions, outcomes, monitoring | Neon Postgres, through `DATABASE_URL` | Render Free wipes local files when a service sleeps or restarts; Neon keeps them |
+
+Without `DATABASE_URL`, everything runs on local SQLite, so development needs no database server. Set it in `.env` (never commit it): `make run`, `make monitor`, and `make retrain` read that file. Tests never use `DATABASE_URL`.
+
+**Keeping Neon asleep:** `/health` never touches the database, because the host calls it constantly, and the API keeps no idle database connections. Neon's compute can therefore scale to zero when nobody is using the demo.
+
+### Demo data
+
+So that visitors see a working monitoring report, a fresh demo database is filled once at startup (`SEED_DEMO_DATA=true`, set only on the Render API service; off by default):
+
+- **Synthetic, not real:** 600 generated leads ([`deploy/demo_seed.json`](deploy/demo_seed.json)). Each input field is drawn from its training distribution, using only the saved model and its profile of shares and quantiles, and leads are selected so their scores follow the training score distribution. Each outcome is drawn from the model's predicted probability for that lead. No rows are copied, and `make demo-seed-file` regenerates the same file with a fixed seed, without the original dataset ([`synthetic.py`](src/apex/monitoring/synthetic.py)).
+- **Spread over time:** 300 predictions in the last 7 days, and 600 outcomes in the last 30 days, which passes the monitoring thresholds. Monitoring runs once afterwards, so `GET /monitoring/latest` has a report.
+- **Clearly marked:** the rows have `source = 'demo_seed'`. On the demo, monitoring reads only these rows (`MONITORING_SOURCE`), and the report says so. `make retrain` ignores them, so they can never decide whether a model is replaced.
+- **Idempotent:** new rows are added only when `predictions` is empty, so restarts add nothing.
+- **Kept fresh:** at most once a day, the demo rows get new timestamps and monitoring runs again, so they never age out of the monitoring windows. Only the timestamps of `demo_seed` rows change. The dates in the report therefore show how monitoring works, not when these leads arrived.
+- **Not evidence of model quality:** on these rows the report shows PR-AUC **0.821**, High-segment precision **91%**, and 41% conversion, with drift checks `ok`. Outcomes come from the model's own probabilities and the leads are built to resemble training data, so those numbers only show that monitoring works. **The model's real performance is the held-out test result: PR-AUC 0.787 and 83% precision in the top 20%** ([Results](#results)).
+
+### Protecting the public demo
+
+Data now persists, so misuse would last. Everything below is set by environment variables in [`render.yaml`](render.yaml), and is off for local use unless noted.
+
+| Risk | Protection |
+|---|---|
+| Fake outcomes or monitoring runs | `POST /outcomes` and `POST /monitoring/run` need `X-API-Key`. Render generates the key and shares it with the Streamlit demo on the server, so visitors use the demo without ever seeing it |
+| A missing key setting | With `DATABASE_URL` set but no `API_KEY`, those two endpoints refuse every request instead of staying open |
+| Visitors changing the CV report | Monitoring reads only demo rows, so leads sent to the open `/predict` endpoints cannot change it |
+| Scripts sending many requests | 30 requests a minute per client, for `/predict/*`, `/monitoring/*`, and `/health/db`, based on Cloudflare's client address, which `X-Forwarded-For` cannot fake. The demo's key is exempt, because all its visitors share one address |
+| Huge requests | At most 100 leads per batch for every caller, and rejected requests are logged at 2,000 characters at most |
+| Filling the 1 GB database | Visitor rows older than 30 days are deleted, and only the newest 100,000 are kept. This is the hard limit: the rate limit alone would still allow about 4 million rows a day. Demo rows are never deleted |
+
+Limits are counted in memory, per API process, and reset when the service restarts. `/predict/*` stays open on purpose so that anyone can try it from [`/docs`](https://aurynix-apex.onrender.com/docs). This protects a demo; real customer data would need real authentication for every endpoint.
+
+### Cold starts
+
+Render Free services sleep after 15 minutes without traffic and take about a minute to wake, separately. The Streamlit demo retries while the API wakes (`API_WAKE_SECONDS`) and shows "API is starting up, please wait", so the first visit can take up to 2 minutes. After that, responses are normal until the services sleep again.
+
 ## Tech Stack
 
 | Layer | Tools |
@@ -400,7 +470,8 @@ Drift shows that the **data** changed; outcomes show whether the model is still 
 | Explainability | Exact linear SHAP (own code, checked against `shap` in tests) |
 | Visualization | Matplotlib |
 | API | FastAPI, Uvicorn, Pydantic |
-| Persistence | SQLite |
+| Persistence | SQLAlchemy Core; Postgres via psycopg 3 (Neon in the demo), SQLite locally |
+| Hosting | Render Free (API, demo), Neon Free (database) |
 | Monitoring | Own PSI code, JSON reports |
 | Demo | Streamlit |
 | Container & CI/CD | Docker, Docker Compose, GitHub Actions, GHCR |
@@ -414,7 +485,10 @@ aurynix-apex/
 ├── data/                          # git-ignored
 │   ├── raw/                       # Leads.csv, bank-full.csv (the only copies; cleaned in memory)
 │   ├── splits.csv                 # fixed train / val / test split (bank: splits_bank.csv)
-│   └── apex.db                    # SQLite: predictions, outcomes, rejected requests, drift runs
+│   └── apex.db                    # local SQLite: predictions, outcomes, rejected requests, drift runs
+├── deploy/                        # committed, for the Render image
+│   ├── models/                    # the model the demo serves (`make deploy-model`)
+│   └── demo_seed.json             # 600 synthetic leads for the demo (`make demo-seed-file`)
 ├── docs/
 │   ├── problem_framing.md
 │   ├── data_dictionary.md         # sources & leakage audit
@@ -427,7 +501,7 @@ aurynix-apex/
 │   ├── decisions.md               # architecture decision records
 │   ├── api.md                     # API design & reference
 │   ├── monitoring.md              # drift, data quality, outcomes & simulations
-│   ├── deployment.md              # local, Docker, CI/CD, free Render demo
+│   ├── deployment.md              # local, Docker, CI/CD, free Render + Neon demo
 │   └── bank_marketing.md          # second dataset: report & comparison
 ├── notebooks/                     # local scratch for testing (git-ignored)
 ├── src/
@@ -454,13 +528,16 @@ aurynix-apex/
 │       │   ├── reference.py       # build reference_profile.json
 │       │   ├── drift.py           # PSI functions & statuses
 │       │   ├── monitor.py         # feature drift, prediction drift, data quality
-│       │   └── simulate.py        # drift and outcomes demos
+│       │   ├── simulate.py        # drift and outcomes demos
+│       │   ├── seed.py            # demo data for a fresh public deployment
+│       │   └── synthetic.py       # generates the demo's synthetic leads
 │       └── api/
 │           ├── app.py             # app, startup, /health
 │           ├── schemas.py         # request / response validation
 │           ├── dependencies.py    # load model once, inject services
 │           ├── service.py         # ScoringService: score, segment, explain, log, outcomes
-│           ├── database.py        # SQLite tables
+│           ├── database.py        # Postgres or SQLite: tables and queries
+│           ├── security.py        # API key, rate limit, and other public-demo settings
 │           └── routers/
 │               ├── model.py
 │               ├── predict.py
@@ -569,7 +646,7 @@ Run `make help` for the full list.
 | | `make outcomes-demo` | Send real outcomes, then changed behavior; the performance check recommends retraining |
 | | `make mlflow-ui` | Open MLflow at `http://localhost:5000` |
 | Docker | `make docker-build` / `make docker-up` / `make docker-down` | Build the image / start API + demo / stop |
-| Render | `make deploy-model` | Copy the saved model to `deploy/models/` for the free Render demo |
+| Render | `make deploy-model` / `make demo-seed-file` | Copy the saved model to `deploy/models/` / regenerate the synthetic `deploy/demo_seed.json` |
 | Quality | `make lint` / `make format` / `make test` / `make clean` | Ruff, pytest, cleanup |
 
 ## Configuration
@@ -582,6 +659,23 @@ All paths, filenames, thresholds, and dataset choices live in a config file load
 | `config_bank.json` | Bank Marketing | `APEX_CONFIG=config_bank.json make …` |
 
 Each config holds: data source and file format, cleaning rules, leakage columns, feature blocks, explanation labels, model settings, split, segment capacity shares, monitoring thresholds, and its own output paths ([ADR-009](docs/decisions.md)).
+
+Environment variables (see [`.env.example`](.env.example)):
+
+| Variable | Default | Use |
+|---|---|---|
+| `DATABASE_URL` | empty: local SQLite | Postgres connection string; `postgres://` and `postgresql://` both work. A secret: never commit it |
+| `SEED_DEMO_DATA` | off | `true` fills an empty database with [demo data](#demo-data) at API startup and keeps it fresh |
+| `API_KEY` | empty | Required by `/outcomes` and `/monitoring/run`; the Streamlit demo sends it. With `DATABASE_URL` set and no key, those endpoints refuse every request. A secret |
+| `RATE_LIMIT_PER_MINUTE` | off | Requests per client for `/predict/*`, `/monitoring/*`, `/health/db` |
+| `MAX_BATCH_SIZE` | `10000` | Most leads per `/predict/batch` |
+| `VISITOR_RETENTION_DAYS` | off | Delete visitor predictions, rejected requests, and old reports after this many days |
+| `MAX_VISITOR_ROWS` | off | Keep only this many of the newest visitor predictions and rejected requests |
+| `MONITORING_SOURCE` | every row | Monitor only rows from this source (`demo_seed` on the demo) |
+| `TRUST_CF_CONNECTING_IP` | off | `true` only behind Cloudflare: use its client address header for the rate limit |
+| `API_WAKE_SECONDS` | `0` | How long the Streamlit demo waits for a sleeping API |
+| `API_URL` | `http://localhost:8000` | The API the Streamlit demo calls |
+| `APEX_CONFIG` | `config.json` | The config file to use |
 
 ## Roadmap
 
@@ -616,6 +710,8 @@ Each config holds: data source and file format, cleaning rules, leakage columns,
 ### Later
 - [x] `outcomes` table and live performance tracking
 - [x] Apply the pipeline to the Bank Marketing dataset
+- [x] Public demo: Render + Neon Postgres, with marked synthetic demo data
+- [x] Public demo protection: API key, rate limit, batch limit, clean-up, fresh demo data
 - [ ] Integration with Aurynix Pulse
 
 ## Design Decisions
