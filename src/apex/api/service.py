@@ -12,21 +12,20 @@ It is created once at startup from the saved artifacts (`make train`); the API
 never trains.
 """
 
-import sqlite3
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from apex.api.database import log_predictions, record_outcomes
+from apex.api.database import Database, log_predictions, record_outcomes
 from apex.models.explain import Explainer
 from apex.models.predict import explainer_from
 from apex.models.segment import assign
 
 
 class ScoringService:
-    def __init__(self, model: Pipeline, meta: dict[str, Any], db: sqlite3.Connection):
+    def __init__(self, model: Pipeline, meta: dict[str, Any], db: Database):
         self.model = model
         self.meta = meta
         self.db = db

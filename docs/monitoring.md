@@ -3,7 +3,7 @@
 > Stage 14 (step 4.4). Code: [`src/apex/monitoring/`](../src/apex/monitoring/). Settings: `config.json → monitoring`.
 
 ```bash
-make monitor      # check the last 7 days of API predictions (data/apex.db)
+make monitor      # check the last 7 days of API predictions (DATABASE_URL, or data/apex.db)
 make drift-demo   # simulate stable vs. drifted traffic and show the result
 ```
 
@@ -107,7 +107,7 @@ Only the outcomes catch this case. (The first scenario is in-sample, since the f
 
 | Place | Content |
 |---|---|
-| SQLite `drift_runs` (`data/apex.db`) | One row per run: time, sample size, status, score PSI, full report (JSON) |
+| Table `drift_runs` (Postgres or SQLite) | One row per run: time, sample size, status, score PSI, full report (JSON) |
 | `reports/monitoring/latest.json` | The latest report, for people |
 | `GET /monitoring/latest`, `/monitoring/history` | The same, through the API |
 
@@ -147,6 +147,10 @@ API:
   }
 }
 ```
+
+## Demo data
+
+On the public demo, monitoring includes the seeded rows (`source = 'demo_seed'`), so the report mixes them with visitors' leads. `make retrain` ignores them. Details: [README](../README.md#demo-data).
 
 ## Not done (on purpose)
 

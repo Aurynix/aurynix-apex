@@ -233,6 +233,7 @@ The step's checkbox and **Log** entry are updated in the same branch.
 - [x] CI/CD (GitHub Actions: lint + test on every push and PR; Docker build on PRs, push to GHCR on `main`) — `.github/workflows/ci-cd.yml`.
 - [x] Remove unused dependencies (`xgboost`, `lightgbm`, `optuna`, `evidently`, `seaborn`, `pyarrow`, `python-multipart`; `shap` moved to dev): smaller installs and Docker image.
 - [x] Safe retraining (`make retrain`): champion vs. challenger on real outcomes or a holdout; promote only if at least as good; archive the old model (ADR-010).
+- [x] Free public demo on Render with Neon Postgres (`DATABASE_URL`) and marked demo data (`SEED_DEMO_DATA`) (ADR-011).
 
 ---
 

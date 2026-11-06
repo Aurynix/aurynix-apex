@@ -14,6 +14,7 @@ Short records of decisions that shape the model and the system. Newest last.
 | [008](#adr-008-real-outcomes-by-prediction-id-and-a-performance-check) | Real outcomes by prediction id and a performance check | 5 |
 | [009](#adr-009-one-pipeline-one-config-per-dataset) | One pipeline, one config per dataset | 6 |
 | [010](#adr-010-safe-retraining-champion-vs-challenger) | Safe retraining: champion vs. challenger | — |
+| [011](#adr-011-postgres-through-database_url-with-marked-demo-data) | Postgres through `DATABASE_URL`, with marked demo data | — |
 
 Other key choices are recorded where they were made: capacity-based segments ([problem_framing.md](problem_framing.md) 4), stratified random split ([splits.md](splits.md)), feature selection ([models.md](models.md) step 2.4).
 
@@ -180,4 +181,18 @@ Other key choices are recorded where they were made: capacity-based segments ([p
 **Why.** One command, one rule, a rollback path. Real outcomes are the fairest test (neither model saw them). The file holdout favors the champion when it was trained on those rows, which errs on the side of keeping a working model.
 
 **Consequences.** Retraining stays a manual, deliberate step (ADR-006): no automatic schedule, no API endpoint. Restart the API to serve a promoted model. Rolling back = copying an archive folder back into `models/`.
+
+---
+
+## ADR-011: Postgres through `DATABASE_URL`, with marked demo data
+
+- **Date:** 2026-11-06 · **Status:** Accepted
+
+**Context.** The free public demo runs on Render, which wipes local files when a service sleeps or restarts. SQLite data therefore disappeared, and monitoring always showed `insufficient_data` to visitors. A persistent disk needs a paid plan.
+
+**Decision.** Use SQLAlchemy Core with psycopg 3. `DATABASE_URL` selects Postgres (Neon Free in the demo); without it, Apex uses local SQLite. Tables are created on startup, with no Alembic: the one schema change so far (`predictions.source`) is a small check at startup. Postgres connections are opened per use, none are kept idle, and `/health` never touches the database, so Neon can scale to zero. With `SEED_DEMO_DATA=true`, an empty database is filled once with 600 real test-set leads and their outcomes, marked `source = 'demo_seed'`, then monitoring runs once. The rows ship in `deploy/demo_seed.json`, because the image has no dataset.
+
+**Why.** It keeps data at no cost, and local development and tests still need no database server. Marking the rows keeps them easy to filter and delete. `make retrain` ignores them: the final model was trained on these same leads, so they would favor the current model and are not new results.
+
+**Consequences.** A new connection per use adds some delay per request, which is fine for a demo but should be revisited for real traffic. The monitoring report on the demo is illustrative, since the rows are in-sample. Seeded rows age out of the monitoring windows (7 and 30 days), so the demo needs an occasional reset. The demo database is open to anyone until the API has authentication.
 

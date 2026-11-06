@@ -25,7 +25,7 @@ ScoringService      all the logic (service.py)
      ├── predict        probability from the saved pipeline
      ├── segment        High / Medium / Low from the saved thresholds
      ├── explain        top reasons up / down
-     └── log            one row per lead in SQLite (data/apex.db)
+     └── log            one row per lead in the database (Postgres or SQLite)
      │
      ▼
    JSON
@@ -33,11 +33,11 @@ ScoringService      all the logic (service.py)
 
 | File | Responsibility |
 |---|---|
-| `app.py` | FastAPI app, startup (lifespan), `/health`, router registration |
+| `app.py` | FastAPI app, startup (lifespan), `/`, `/health`, `/health/db`, router registration |
 | `schemas.py` | Pydantic request / response models: validation only |
 | `dependencies.py` | Load the model once, create the `ScoringService`, inject it into routers |
 | `service.py` | Business logic: score, segment, explain, log, model info |
-| `database.py` | SQLite `predictions` table |
+| `database.py` | Tables and queries: Postgres when `DATABASE_URL` is set, otherwise SQLite |
 | `routers/model.py`, `routers/predict.py` | Endpoints: validate → service → response |
 
 Routers do not know how the model works.
@@ -46,7 +46,9 @@ Routers do not know how the model works.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness check and loaded model version |
+| `GET` | `/` | Redirects to `/docs` (not listed in the schema) |
+| `GET` | `/health` | Liveness check and loaded model version. Never touches the database, because the host calls it constantly and that would keep a serverless database awake |
+| `GET` | `/health/db` | `{"status": "ok", "backend": "postgresql"}`, or `503` with `"status": "unavailable"`. Call it by hand, not from an uptime monitor |
 | `GET` | `/model/info` | Model version, training date, input fields, segment thresholds, test metrics |
 | `POST` | `/predict/single` | Score one lead: score, segment, reasons |
 | `POST` | `/predict/batch` | Score up to 10,000 leads (results keep input order) |
@@ -130,7 +132,7 @@ curl -X POST localhost:8000/predict/batch -H 'content-type: application/json' \
 
 ## Prediction log
 
-Every scored lead is saved in `data/apex.db` (`config.json → paths.database`), table `predictions`:
+Every scored lead is saved in table `predictions`, in Postgres when `DATABASE_URL` is set, otherwise in the SQLite file `data/apex.db` (`config.json → paths.database`):
 
 | Column | Example |
 |---|---|
@@ -140,6 +142,7 @@ Every scored lead is saved in `data/apex.db` (`config.json → paths.database`),
 | `lead` | the 7 input fields as JSON (raw column names) |
 | `score` | 0.9568 |
 | `segment` | `high` |
+| `source` | `api`, or `demo_seed` for [demo data](../README.md#demo-data) |
 
 Drift monitoring reads this table ([monitoring.md](monitoring.md)).
 

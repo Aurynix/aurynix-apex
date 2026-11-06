@@ -1,20 +1,27 @@
 """Shared fixtures: a small model trained on synthetic leads, its metadata and
-reference profile, and in-memory databases. No saved artifacts are needed."""
+reference profile, and in-memory databases. No saved artifacts are needed.
+
+The `db` fixture uses in-memory SQLite. To run the tests on Postgres, set
+TEST_DATABASE_URL to a throwaway database: its tables are DROPPED before every test.
+DATABASE_URL is cleared here, so tests can never touch a real database by accident."""
 
 import copy
-import sqlite3
+import os
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from apex.api.database import init_db
+from apex.api.database import Database, connect, metadata, normalize_url
 from apex.api.service import ScoringService
 from apex.config import load_config
 from apex.models.explain import Explainer
 from apex.models.train import make_model
 from apex.monitoring.monitor import Monitor
 from apex.monitoring.reference import build_profile
+
+os.environ.pop("DATABASE_URL", None)
+os.environ.pop("SEED_DEMO_DATA", None)
 
 
 def synthetic_leads(n: int, seed: int = 0) -> pd.DataFrame:
@@ -68,9 +75,14 @@ def trained():
 
 @pytest.fixture
 def db():
-    conn = init_db(sqlite3.connect(":memory:", check_same_thread=False))
-    yield conn
-    conn.close()
+    url = os.environ.get("TEST_DATABASE_URL")
+    if url:
+        throwaway = Database(normalize_url(url))
+        metadata.drop_all(throwaway.engine)
+        throwaway.close()
+    database = connect(url or "sqlite://")
+    yield database
+    database.close()
 
 
 @pytest.fixture

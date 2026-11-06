@@ -19,13 +19,12 @@ And, when real results have been sent to POST /outcomes:
 
 Drift and data quality need `min_samples` predictions, performance needs
 `min_outcomes` outcomes; with neither, the status is `insufficient_data`. Each run is
-saved in SQLite (`drift_runs`) and as reports/monitoring/latest.json.
+saved in the database (`drift_runs`) and as reports/monitoring/latest.json.
 
 Run `python -m apex.monitoring.monitor` (or `make monitor`).
 """
 
 import json
-import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -33,6 +32,7 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 
 from apex.api.database import (
+    Database,
     count_rejections,
     drift_runs,
     now,
@@ -50,7 +50,7 @@ class Monitor:
         self,
         model: Pipeline,
         profile: dict[str, Any],
-        db: sqlite3.Connection,
+        db: Database,
         config: dict[str, Any] | None = None,
         expected: dict[str, float] | None = None,
     ):
@@ -260,7 +260,7 @@ def summary(report: dict[str, Any]) -> str:
 
 
 def create_monitor(
-    db: sqlite3.Connection | None = None,
+    db: Database | None = None,
     model: Pipeline | None = None,
     meta: dict[str, Any] | None = None,
 ) -> Monitor:
@@ -274,7 +274,7 @@ def create_monitor(
     with (path("models_dir") / cfg["files"]["reference_profile"]).open(encoding="utf-8") as f:
         profile = json.load(f)
     expected = meta["performance"]["test"]
-    return Monitor(model, profile, db or connect(path("database")), cfg, expected)
+    return Monitor(model, profile, db or connect(), cfg, expected)
 
 
 if __name__ == "__main__":
