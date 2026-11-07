@@ -120,7 +120,7 @@ def test_last_run_keeps_an_unreadable_timestamp_visible():
     assert demo.last_run("not a date", NOW) == "last run not a date"
 
 
-def _render_report(monkeypatch, data_source):
+def _render_report(monkeypatch, data_source, extra=None):
     """Run the page against a fake API that has one monitoring report."""
     from streamlit.testing.v1 import AppTest
 
@@ -138,6 +138,7 @@ def _render_report(monkeypatch, data_source):
     }
     if data_source:
         report["data_source"] = data_source
+    report.update(extra or {})
     info = {
         "model_version": "apex-test",
         "trained_at": "2026-10-07T00:00:00+00:00",
@@ -209,6 +210,25 @@ def test_other_data_keeps_colored_deltas_and_no_demo_caption(monkeypatch):
     at = _render_report(monkeypatch, None)
     assert "Synthetic demo outcomes" not in _captions(at)
     assert _delta_colors(at) == {Metric.MetricColor.GREEN}
+
+
+def test_drift_and_data_quality_tables_are_explained(monkeypatch):
+    full = {
+        "prediction": {"segment_shares": {"current": {"high": 0.2}, "reference": {"high": 0.2}}},
+        "features": {"TotalVisits": {"status": "ok", "psi": 0.01}},
+        "data_quality": {
+            "status": "ok",
+            "missing_rate": {"TotalVisits": {"reference": 0.0, "current": 0.0, "status": "ok"}},
+            "defaulted_share": 0.5,
+            "rejected_requests": 0,
+            "rejection_rate": 0.0,
+        },
+    }
+    at = _render_report(monkeypatch, "demo_seed", full)
+    text = " ".join(m.value for m in at.markdown)
+    assert "Population Stability Index" in text
+    assert "below 0.10" in text and "0.25 or more" in text
+    assert "share of missing values" in text
 
 
 def _raise_http(code: int):

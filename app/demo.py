@@ -45,6 +45,24 @@ FIELDS = list(RAW_TO_API.values())
 SEGMENT_ICON = {"high": "🟢 High", "medium": "🟡 Medium", "low": "🔴 Low"}
 STATUS_ICON = {"ok": "🟢 ok", "warning": "🟡 warning", "drift": "🔴 drift"}
 
+# Thresholds match `monitoring` in config.json.
+PSI_HELP = """\
+**PSI (Population Stability Index)** measures how much each field has changed \
+since training. In other words: are the leads coming in now the same kind of people?
+
+| PSI | Status | Meaning |
+|---|---|---|
+| below 0.10 | 🟢 ok | Stable: almost the same people |
+| 0.10 to 0.25 | 🟡 warning | Noticeable change: the audience is starting to differ, investigate |
+| 0.25 or more | 🔴 drift | Big change: a different audience |
+"""
+
+DATA_QUALITY_HELP = """\
+This is not PSI. It shows the **share of missing values** in each field, in training \
+(reference) and now (current). A field gets a warning if its missing rate rises by \
+10 points or more, which usually means a field stopped being sent.
+"""
+
 
 def time_ago(seconds: float) -> str:
     """A duration in words, for example "2 min ago"."""
@@ -274,12 +292,14 @@ def tab_monitoring() -> None:
     st.bar_chart(pd.DataFrame(shares).rename(index=str.capitalize), stack=False)
 
     st.subheader("Feature drift (PSI)")
+    st.markdown(PSI_HELP)
     features = pd.DataFrame(report["features"]).T.sort_values("psi", ascending=False)
     features["status"] = features["status"].map(STATUS_ICON)
     st.dataframe(features[["status", "psi"]], width="stretch")
 
     dq = report["data_quality"]
     st.subheader(f"Data quality: {STATUS_ICON.get(dq['status'], dq['status'])}")
+    st.markdown(DATA_QUALITY_HELP)
     missing = pd.DataFrame(dq["missing_rate"]).T[["reference", "current", "status"]]
     st.dataframe(missing, width="stretch")
     st.caption(
