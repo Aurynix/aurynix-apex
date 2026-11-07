@@ -327,7 +327,7 @@ make run     # → http://localhost:8000/docs
     ],
     "down": ["Lead origin = Landing Page Submission"]
   },
-  "model_version": "apex-v0.1.0"
+  "model_version": "apex-v1.0.0"
 }
 ```
 

@@ -1,7 +1,7 @@
 {
   "model_details": {
     "name": "Aurynix Apex lead scoring model",
-    "version": "apex-v0.1.0",
+    "version": "apex-v1.0.0",
     "trained_at": "2026-10-05T22:12:59+00:00",
     "owner": "Yazan Al-Sedih (Aurynix)",
     "license": "MIT",

@@ -1,5 +1,5 @@
 {
-  "model_version": "apex-v0.1.0",
+  "model_version": "apex-v1.0.0",
   "trained_at": "2026-10-07T03:25:59+00:00",
   "sklearn_version": "1.9.1",
   "data": {
