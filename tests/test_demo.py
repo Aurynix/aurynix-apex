@@ -96,12 +96,20 @@ def test_last_run_says_how_long_ago(age, words):
 def test_last_run_matches_the_requested_format():
     assert (
         demo.last_run("2026-11-06T22:48:00+00:00", NOW)
-        == "last run 2 min ago (6 Nov 2026, 22:48 UTC)"
+        == "last run 2 min ago (7 Nov 2026, 00:48 Jerusalem time)"
     )
 
 
-def test_last_run_shows_the_time_in_utc():
-    assert demo.last_run("2026-11-07T00:48:00+02:00", NOW).endswith("(6 Nov 2026, 22:48 UTC)")
+def test_last_run_converts_any_offset_to_jerusalem_time():
+    assert demo.last_run("2026-11-06T17:48:00-05:00", NOW).endswith(
+        "(7 Nov 2026, 00:48 Jerusalem time)"
+    )
+
+
+def test_last_run_follows_daylight_saving():
+    assert demo.last_run("2026-07-01T22:48:00+00:00", NOW).endswith(
+        "(2 Jul 2026, 01:48 Jerusalem time)"
+    )
 
 
 def test_last_run_handles_a_clock_ahead_of_the_report():
@@ -163,10 +171,24 @@ def _delta_colors(at) -> set[int]:
     return {m.proto.color for m in at.metric if "vs. test" in m.delta}
 
 
+def test_page_uses_the_logo_and_no_emoji_in_the_title(monkeypatch):
+    at = _render_report(monkeypatch, None)
+    assert at.title[0].value == "Aurynix Apex: lead scoring"
+
+
+def test_logo_file_exists_and_is_a_static_svg():
+    logo = Path(demo.LOGO)
+    assert logo.parent.name == "app"  # the Dockerfiles copy app/ into the image
+    text = logo.read_text(encoding="utf-8").lower()
+    assert text.lstrip().startswith("<svg")
+    assert "<script" not in text
+    assert "http" not in text.replace("http://www.w3.org/2000/svg", "")
+
+
 def test_report_uses_the_new_heading_and_a_readable_time(monkeypatch):
     at = _render_report(monkeypatch, None)
     assert [s.value for s in at.subheader][0] == "Performance on recorded outcomes"
-    assert "(6 Nov 2026, 22:48 UTC)" in _captions(at)
+    assert "(7 Nov 2026, 00:48 Jerusalem time)" in _captions(at)
     assert "2026-11-06T22:48" not in _captions(at)
 
 

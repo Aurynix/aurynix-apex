@@ -14,11 +14,16 @@ import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
+LOGO = str(Path(__file__).with_name("icon.svg"))
 DEMO_SOURCE = "demo_seed"
+DISPLAY_TIMEZONE = ZoneInfo("Asia/Jerusalem")  # follows daylight saving by itself
+DISPLAY_TIMEZONE_NAME = "Jerusalem time"
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
 API_KEY = os.environ.get("API_KEY", "").strip()  # server side only: never shown to visitors
 # How long to wait for a sleeping API to wake up (free hosting). 0 = fail at once (local use).
@@ -56,13 +61,14 @@ def time_ago(seconds: float) -> str:
 
 
 def last_run(created_at: str, now: datetime | None = None) -> str:
-    """An ISO timestamp as "last run 2 min ago (6 Nov 2026, 22:48 UTC)"."""
+    """An ISO timestamp as "last run 2 min ago (7 Nov 2026, 00:48 Jerusalem time)"."""
     try:
-        when = datetime.fromisoformat(created_at).astimezone(UTC)
+        when = datetime.fromisoformat(created_at).astimezone(DISPLAY_TIMEZONE)
     except ValueError:
         return f"last run {created_at}"
     now = now or datetime.now(UTC)
-    return f"last run {time_ago((now - when).total_seconds())} ({when.day} {when:%b %Y, %H:%M} UTC)"
+    shown = f"{when.day} {when:%b %Y, %H:%M} {DISPLAY_TIMEZONE_NAME}"
+    return f"last run {time_ago((now - when).total_seconds())} ({shown})"
 
 
 class ApiUnavailable(RuntimeError):
@@ -283,8 +289,9 @@ def tab_monitoring() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Aurynix Apex", page_icon="🎯", layout="wide")
-    st.title("🎯 Aurynix Apex: lead scoring")
+    st.set_page_config(page_title="Aurynix Apex", page_icon=LOGO, layout="wide")
+    st.logo(LOGO, size="large")
+    st.title("Aurynix Apex: lead scoring")
     try:
         with st.spinner("API is starting up, please wait. This can take up to 2 minutes..."):
             info = wait_for_api("/model/info", API_WAKE_SECONDS)
