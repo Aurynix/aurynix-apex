@@ -17,8 +17,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import altair as alt
 import pandas as pd
 import streamlit as st
+
+from apex.config import load_config
 
 LOGO = str(Path(__file__).with_name("icon.svg"))
 DEMO_SOURCE = "demo_seed"
@@ -44,24 +47,103 @@ RAW_TO_API = {
 FIELDS = list(RAW_TO_API.values())
 SEGMENT_ICON = {"high": "🟢 High", "medium": "🟡 Medium", "low": "🔴 Low"}
 STATUS_ICON = {"ok": "🟢 ok", "warning": "🟡 warning", "drift": "🔴 drift"}
+SEGMENT_ORDER = ["High", "Medium", "Low"]
+# Monitoring field names → the labels used on the Score a lead tab.
+FIELD_LABELS = {
+    "Lead Origin": "Lead origin",
+    "Lead Source": "Lead source",
+    "Do Not Email": "Opted out of emails",
+    "TotalVisits": "Website visits",
+    "Total Time Spent on Website": "Time on website",
+    "Specialization": "Specialization",
+    "What is your current occupation": "Occupation",
+    "time_per_visit": "Time per visit",
+    "has_web_activity": "Has web activity",
+}
+# Score a CSV: input fields shown next to each score (and kept in the download).
+BATCH_INPUT_COLUMNS = [
+    "lead_origin",
+    "lead_source",
+    "occupation",
+    "total_visits",
+    "time_on_website",
+]
 
-# Thresholds match `monitoring` in config.json.
-PSI_HELP = """\
+
+def field_label(name: str) -> str:
+    """A readable label for a monitored field; unknown names are tidied, not hidden."""
+    return FIELD_LABELS.get(name, name.replace("_", " ").capitalize())
+
+
+def psi_help(mon: dict) -> str:
+    """Explanation shown above the feature drift table (thresholds from config.json)."""
+    warn, drift = mon["psi_warning"], mon["psi_drift"]
+    return f"""\
 **PSI (Population Stability Index)** measures how much each field has changed \
 since training. In other words: are the leads coming in now the same kind of people?
 
 | PSI | Status | Meaning |
 |---|---|---|
-| below 0.10 | 🟢 ok | Stable: almost the same people |
-| 0.10 to 0.25 | 🟡 warning | Noticeable change: the audience is starting to differ, investigate |
-| 0.25 or more | 🔴 drift | Big change: a different audience |
+| below {warn:.2f} | 🟢 ok | Stable: almost the same people |
+| {warn:.2f} to {drift:.2f} | 🟡 warning | Noticeable change: the audience is starting to differ, \
+investigate |
+| {drift:.2f} or more | 🔴 drift | Big change: a different audience |
 """
 
-DATA_QUALITY_HELP = """\
+
+def data_quality_help(mon: dict) -> str:
+    """Explanation shown above the data quality table (threshold from config.json)."""
+    points = mon["missing_rate_change_warning"] * 100
+    return f"""\
 This is not PSI. It shows the **share of missing values** in each field, in training \
 (reference) and now (current). A field gets a warning if its missing rate rises by \
-10 points or more, which usually means a field stopped being sent.
+{points:g} points or more, which usually means a field stopped being sent.
 """
+
+
+def segment_chart(shares: dict) -> alt.Chart:
+    """Grouped bars of segment shares, High → Medium → Low, y-axis from 0."""
+    data = (
+        pd.DataFrame(shares)
+        .rename(index=str.capitalize)
+        .rename_axis("segment")
+        .reset_index()
+        .melt(id_vars="segment", var_name="period", value_name="share")
+    )
+    return (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X("segment:N", sort=SEGMENT_ORDER, title=None, axis=alt.Axis(labelAngle=0)),
+            xOffset=alt.XOffset("period:N", sort=["reference", "current"]),
+            y=alt.Y(
+                "share:Q",
+                title="Share of leads",
+                scale=alt.Scale(domainMin=0, zero=True, nice=True),
+                axis=alt.Axis(format="%"),
+            ),
+            color=alt.Color("period:N", sort=["reference", "current"], title=None),
+            tooltip=["segment", "period", alt.Tooltip("share:Q", format=".1%")],
+        )
+    )
+
+
+def ranked_leads(df: pd.DataFrame, leads: list[dict], result: list[dict]) -> pd.DataFrame:
+    """Scored leads, best first, with the file row number and the main input fields."""
+    ranked = pd.DataFrame(
+        {
+            "row": range(1, len(df) + 1),  # 1 = the first data row of the uploaded file
+            "score": [p["score"] for p in result],
+            "segment": [SEGMENT_ICON[p["segment"]] for p in result],
+        }
+    )
+    inputs = pd.DataFrame(leads).reindex(columns=BATCH_INPUT_COLUMNS)
+    ranked = pd.concat([ranked, inputs], axis=1)
+    ranked["top reason up"] = [", ".join(p["reasons"]["up"][:1]) for p in result]
+    ranked["top reason down"] = [", ".join(p["reasons"]["down"][:1]) for p in result]
+    if "Prospect ID" in df.columns:
+        ranked.insert(1, "Prospect ID", df["Prospect ID"].to_numpy())
+    return ranked.sort_values("score", ascending=False, kind="stable")
 
 
 def time_ago(seconds: float) -> str:
@@ -210,18 +292,7 @@ def tab_batch(limit: int) -> None:
         df = df.head(limit)
     leads = leads_from_csv(df)
     result = score_batch(leads)
-    ranked = pd.DataFrame(
-        {
-            "score": [p["score"] for p in result],
-            "segment": [SEGMENT_ICON[p["segment"]] for p in result],
-            "top reason up": [", ".join(p["reasons"]["up"][:1]) for p in result],
-            "top reason down": [", ".join(p["reasons"]["down"][:1]) for p in result],
-        },
-        index=df.index,
-    )
-    if "Prospect ID" in df.columns:
-        ranked.insert(0, "Prospect ID", df["Prospect ID"])
-    ranked = ranked.sort_values("score", ascending=False)
+    ranked = ranked_leads(df, leads, result)
     counts = ranked["segment"].value_counts()
     cols = st.columns(3)
     for col, seg in zip(cols, SEGMENT_ICON.values(), strict=True):
@@ -287,21 +358,27 @@ def tab_monitoring() -> None:
         st.warning(f"Not enough predictions for a reliable check (status: {report['status']}).")
         return
 
+    mon = load_config()["monitoring"]
     shares = report["prediction"]["segment_shares"]
     st.subheader("Segments: training vs. now")
-    st.bar_chart(pd.DataFrame(shares).rename(index=str.capitalize), stack=False)
+    st.altair_chart(segment_chart(shares), width="stretch")
 
     st.subheader("Feature drift (PSI)")
-    st.markdown(PSI_HELP)
+    st.markdown(psi_help(mon))
     features = pd.DataFrame(report["features"]).T.sort_values("psi", ascending=False)
     features["status"] = features["status"].map(STATUS_ICON)
+    features = features.rename(index=field_label).rename_axis("field")
     st.dataframe(features[["status", "psi"]], width="stretch")
 
     dq = report["data_quality"]
     st.subheader(f"Data quality: {STATUS_ICON.get(dq['status'], dq['status'])}")
-    st.markdown(DATA_QUALITY_HELP)
+    st.markdown(data_quality_help(mon))
     missing = pd.DataFrame(dq["missing_rate"]).T[["reference", "current", "status"]]
-    st.dataframe(missing, width="stretch")
+    missing = missing.rename(index=field_label).rename_axis("field")
+    for col in ("reference", "current"):
+        missing[col] = pd.to_numeric(missing[col]) * 100
+    percent = st.column_config.NumberColumn(format="%.1f%%")
+    st.dataframe(missing, width="stretch", column_config={"reference": percent, "current": percent})
     st.caption(
         f"Leads relying on defaults: {dq['defaulted_share']:.0%} · "
         f"rejected requests: {dq['rejected_requests']} ({dq['rejection_rate']:.1%})"
