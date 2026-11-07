@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "aurynix-apex",
-    "model_version": "apex-v0.1.0",
+    "model_version": "apex-v1.0.0",
     "experiment": "apex-lead-scoring",
     "model_card": true
   },

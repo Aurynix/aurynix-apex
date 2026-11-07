@@ -93,3 +93,11 @@ def test_the_real_monitoring_report_is_healthy_with_the_real_model(
     assert report["retrain_recommended"] is False
     assert report["performance"]["status"] == "ok"
     assert report["n_samples"] == 300
+
+
+def test_model_version_is_the_same_everywhere(artifacts):
+    _, meta, profile = artifacts
+    version = load_config()["project"]["model_version"]
+    assert version == "apex-v1.0.0"
+    assert meta["model_version"] == version
+    assert profile["model_version"] == version
