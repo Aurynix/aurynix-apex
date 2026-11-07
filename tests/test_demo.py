@@ -318,6 +318,28 @@ def test_ranked_csv_has_row_numbers_and_input_fields():
     assert list(downloaded.columns) == list(ranked.columns)
 
 
+def test_csv_time_is_minutes_on_screen_and_seconds_in_the_download():
+    df = pd.DataFrame({"x": [1, 2]})
+    leads = [
+        {"lead_origin": "API", "time_on_website": 600},
+        {"lead_origin": "Lead Add Form", "time_on_website": 95},
+    ]
+    result = [
+        {"score": score, "segment": "low", "reasons": {"up": [], "down": []}}
+        for score in (0.9, 0.1)
+    ]
+    ranked = demo.ranked_leads(df, leads, result)
+
+    screen = demo.ranked_for_screen(ranked)
+    assert "time_on_website" not in screen.columns
+    assert list(screen["Time on website (min)"]) == [10.0, 1.6]
+
+    downloaded = pd.read_csv(io.StringIO(ranked.to_csv(index=False)))
+    assert list(downloaded["time_on_website"]) == [600, 95]
+    # The download can be uploaded again and gives the API the same leads (in seconds).
+    assert demo.leads_from_csv(downloaded) == leads
+
+
 def _raise_http(code: int):
     def urlopen(request, timeout):
         raise urllib.error.HTTPError("http://api", code, "error", {}, io.BytesIO(b"detail"))

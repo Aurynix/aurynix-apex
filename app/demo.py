@@ -146,6 +146,14 @@ def ranked_leads(df: pd.DataFrame, leads: list[dict], result: list[dict]) -> pd.
     return ranked.sort_values("score", ascending=False, kind="stable")
 
 
+def ranked_for_screen(ranked: pd.DataFrame) -> pd.DataFrame:
+    """The on-screen table: time in minutes, like the Score a lead form. The download keeps
+    seconds under the API name, so the file can be uploaded and scored again."""
+    shown = ranked.copy()
+    shown["time_on_website"] = (pd.to_numeric(shown["time_on_website"]) / 60).round(1)
+    return shown.rename(columns={"time_on_website": "Time on website (min)"})
+
+
 def time_ago(seconds: float) -> str:
     """A duration in words, for example "2 min ago"."""
     minutes = int(seconds // 60)
@@ -297,7 +305,7 @@ def tab_batch(limit: int) -> None:
     cols = st.columns(3)
     for col, seg in zip(cols, SEGMENT_ICON.values(), strict=True):
         col.metric(seg, f"{counts.get(seg, 0):,}")
-    st.dataframe(ranked, width="stretch", hide_index=True)
+    st.dataframe(ranked_for_screen(ranked), width="stretch", hide_index=True)
     st.download_button("Download ranked leads", ranked.to_csv(index=False), "ranked_leads.csv")
 
 
