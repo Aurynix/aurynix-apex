@@ -103,7 +103,7 @@ curl -X POST localhost:8000/predict/single -H 'content-type: application/json' -
     ],
     "down": ["Lead origin = Landing Page Submission"]
   },
-  "model_version": "apex-v0.1.0"
+  "model_version": "apex-v1.0.0"
 }
 ```
 
@@ -128,7 +128,7 @@ curl -X POST localhost:8000/predict/batch -H 'content-type: application/json' \
           "Occupation = Missing"
         ]
       },
-      "model_version": "apex-v0.1.0"
+      "model_version": "apex-v1.0.0"
     }
   ]
 }
@@ -142,7 +142,7 @@ Every scored lead is saved in table `predictions`, in Postgres when `DATABASE_UR
 |---|---|
 | `id` | 1 |
 | `created_at` | `2026-10-06T00:00:00+00:00` (UTC) |
-| `model_version` | `apex-v0.1.0` |
+| `model_version` | `apex-v1.0.0` |
 | `lead` | the 7 input fields as JSON (raw column names) |
 | `score` | 0.9568 |
 | `segment` | `high` |
