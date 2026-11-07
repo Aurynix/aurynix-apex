@@ -14,11 +14,13 @@ import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
+LOGO = str(Path(__file__).with_name("icon.svg"))
 DEMO_SOURCE = "demo_seed"
 DISPLAY_TIMEZONE = ZoneInfo("Asia/Jerusalem")  # follows daylight saving by itself
 DISPLAY_TIMEZONE_NAME = "Jerusalem time"
@@ -287,8 +289,9 @@ def tab_monitoring() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Aurynix Apex", page_icon="🎯", layout="wide")
-    st.title("🎯 Aurynix Apex: lead scoring")
+    st.set_page_config(page_title="Aurynix Apex", page_icon=LOGO, layout="wide")
+    st.logo(LOGO, size="large")
+    st.title("Aurynix Apex: lead scoring")
     try:
         with st.spinner("API is starting up, please wait. This can take up to 2 minutes..."):
             info = wait_for_api("/model/info", API_WAKE_SECONDS)

@@ -171,6 +171,20 @@ def _delta_colors(at) -> set[int]:
     return {m.proto.color for m in at.metric if "vs. test" in m.delta}
 
 
+def test_page_uses_the_logo_and_no_emoji_in_the_title(monkeypatch):
+    at = _render_report(monkeypatch, None)
+    assert at.title[0].value == "Aurynix Apex: lead scoring"
+
+
+def test_logo_file_exists_and_is_a_static_svg():
+    logo = Path(demo.LOGO)
+    assert logo.parent.name == "app"  # the Dockerfiles copy app/ into the image
+    text = logo.read_text(encoding="utf-8").lower()
+    assert text.lstrip().startswith("<svg")
+    assert "<script" not in text
+    assert "http" not in text.replace("http://www.w3.org/2000/svg", "")
+
+
 def test_report_uses_the_new_heading_and_a_readable_time(monkeypatch):
     at = _render_report(monkeypatch, None)
     assert [s.value for s in at.subheader][0] == "Performance on recorded outcomes"
