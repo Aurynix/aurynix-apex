@@ -212,23 +212,132 @@ def test_other_data_keeps_colored_deltas_and_no_demo_caption(monkeypatch):
     assert _delta_colors(at) == {Metric.MetricColor.GREEN}
 
 
-def test_drift_and_data_quality_tables_are_explained(monkeypatch):
-    full = {
-        "prediction": {"segment_shares": {"current": {"high": 0.2}, "reference": {"high": 0.2}}},
-        "features": {"TotalVisits": {"status": "ok", "psi": 0.01}},
-        "data_quality": {
-            "status": "ok",
-            "missing_rate": {"TotalVisits": {"reference": 0.0, "current": 0.0, "status": "ok"}},
-            "defaulted_share": 0.5,
-            "rejected_requests": 0,
-            "rejection_rate": 0.0,
+FULL_REPORT = {
+    "prediction": {
+        "segment_shares": {
+            "current": {"high": 0.21, "low": 0.49, "medium": 0.30},
+            "reference": {"high": 0.20, "low": 0.50, "medium": 0.30},
+        }
+    },
+    "features": {
+        "What is your current occupation": {"status": "ok", "psi": 0.0496},
+        "TotalVisits": {"status": "ok", "psi": 0.0104},
+        "time_per_visit": {"status": "ok", "psi": 0.0071},
+    },
+    "data_quality": {
+        "status": "ok",
+        "missing_rate": {
+            "Specialization": {"reference": 0.3658, "current": 0.4, "status": "ok"},
+            "Total Time Spent on Website": {"reference": 0.0, "current": 0.0, "status": "ok"},
         },
-    }
-    at = _render_report(monkeypatch, "demo_seed", full)
+        "defaulted_share": 0.59,
+        "rejected_requests": 0,
+        "rejection_rate": 0.0,
+    },
+}
+
+
+def test_drift_and_data_quality_tables_are_explained(monkeypatch):
+    at = _render_report(monkeypatch, "demo_seed", FULL_REPORT)
     text = " ".join(m.value for m in at.markdown)
     assert "Population Stability Index" in text
     assert "below 0.10" in text and "0.25 or more" in text
-    assert "share of missing values" in text
+    assert "share of missing values" in text and "10 points" in text
+
+
+def test_explanations_follow_the_config_thresholds():
+    mon = {"psi_warning": 0.2, "psi_drift": 0.4, "missing_rate_change_warning": 0.15}
+    assert "below 0.20" in demo.psi_help(mon)
+    assert "0.20 to 0.40" in demo.psi_help(mon)
+    assert "0.40 or more" in demo.psi_help(mon)
+    assert "15 points" in demo.data_quality_help(mon)
+
+
+def test_monitoring_tables_use_clean_labels_and_percentages(monkeypatch):
+    at = _render_report(monkeypatch, "demo_seed", FULL_REPORT)
+    drift, quality = (table.value for table in at.dataframe)
+    assert list(drift.index) == ["Occupation", "Website visits", "Time per visit"]
+    assert list(quality.index) == ["Specialization", "Time on website"]
+    assert quality.loc["Specialization", "reference"] == pytest.approx(36.58)
+    assert quality.loc["Specialization", "current"] == pytest.approx(40.0)
+
+
+@pytest.mark.parametrize(
+    ("name", "label"),
+    [
+        ("What is your current occupation", "Occupation"),
+        ("TotalVisits", "Website visits"),
+        ("Total Time Spent on Website", "Time on website"),
+        ("time_per_visit", "Time per visit"),
+        ("has_web_activity", "Has web activity"),
+        ("some_new_field", "Some new field"),
+    ],
+)
+def test_field_labels(name, label):
+    assert demo.field_label(name) == label
+
+
+def test_segment_chart_is_ordered_and_starts_at_zero():
+    spec = demo.segment_chart(FULL_REPORT["prediction"]["segment_shares"]).to_dict()
+    x, y = spec["encoding"]["x"], spec["encoding"]["y"]
+    assert x["sort"] == ["High", "Medium", "Low"]
+    assert y["scale"]["domainMin"] == 0
+    assert y["scale"]["zero"] is True
+
+
+def test_ranked_csv_has_row_numbers_and_input_fields():
+    df = pd.DataFrame({"Prospect ID": ["a", "b", "c"]})
+    leads = [
+        {"lead_origin": "API", "total_visits": 2},
+        {"lead_origin": "Lead Add Form", "lead_source": "Google", "occupation": "Student"},
+        {"lead_origin": "API", "time_on_website": 600},
+    ]
+
+    def scored(score, segment):
+        return {"score": score, "segment": segment, "reasons": {"up": ["u"], "down": ["d"]}}
+
+    result = [scored(0.2, "low"), scored(0.9, "high"), scored(0.5, "medium")]
+    ranked = demo.ranked_leads(df, leads, result)
+    assert list(ranked.columns) == [
+        "row",
+        "Prospect ID",
+        "score",
+        "segment",
+        "lead_origin",
+        "lead_source",
+        "occupation",
+        "total_visits",
+        "time_on_website",
+        "top reason up",
+        "top reason down",
+    ]
+    assert list(ranked["row"]) == [2, 3, 1]
+    assert list(ranked["Prospect ID"]) == ["b", "c", "a"]
+    assert ranked.iloc[0]["lead_source"] == "Google"
+    downloaded = pd.read_csv(io.StringIO(ranked.to_csv(index=False)))
+    assert list(downloaded.columns) == list(ranked.columns)
+
+
+def test_csv_time_is_minutes_on_screen_and_seconds_in_the_download():
+    df = pd.DataFrame({"x": [1, 2]})
+    leads = [
+        {"lead_origin": "API", "time_on_website": 600},
+        {"lead_origin": "Lead Add Form", "time_on_website": 95},
+    ]
+    result = [
+        {"score": score, "segment": "low", "reasons": {"up": [], "down": []}}
+        for score in (0.9, 0.1)
+    ]
+    ranked = demo.ranked_leads(df, leads, result)
+
+    screen = demo.ranked_for_screen(ranked)
+    assert "time_on_website" not in screen.columns
+    assert list(screen["Time on website (min)"]) == [10.0, 1.6]
+
+    downloaded = pd.read_csv(io.StringIO(ranked.to_csv(index=False)))
+    assert list(downloaded["time_on_website"]) == [600, 95]
+    # The download can be uploaded again and gives the API the same leads (in seconds).
+    assert demo.leads_from_csv(downloaded) == leads
 
 
 def _raise_http(code: int):
