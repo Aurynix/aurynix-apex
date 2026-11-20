@@ -675,6 +675,7 @@ Environment variables (see [`.env.example`](.env.example)):
 | `TRUST_CF_CONNECTING_IP` | off | `true` only behind Cloudflare: use its client address header for the rate limit |
 | `API_WAKE_SECONDS` | `0` | How long the Streamlit demo waits for a sleeping API |
 | `API_URL` | `http://localhost:8000` | The API the Streamlit demo calls |
+| `API_PUBLIC_URL` | `API_URL` | The API link shown in the demo's sidebar (e.g. a custom domain) |
 | `APEX_CONFIG` | `config.json` | The config file to use |
 
 ## Roadmap
