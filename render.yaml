@@ -37,6 +37,8 @@ services:
     region: oregon
     branch: main
     dockerfilePath: ./Dockerfile.render
+    domains: # DNS: CNAME apex -> aurynix-apex-demo.onrender.com
+      - apex.aurynix.dev
     dockerCommand: streamlit run app/demo.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
     envVars:
       - key: PORT
