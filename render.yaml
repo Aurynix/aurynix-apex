@@ -8,6 +8,8 @@ services:
     branch: main
     dockerfilePath: ./Dockerfile.render
     healthCheckPath: /health
+    domains: # DNS: CNAME apex-api -> aurynix-apex.onrender.com
+      - apex-api.aurynix.dev
     envVars:
       - key: PORT
         value: "8000"
@@ -45,6 +47,8 @@ services:
         value: "8501"
       - key: API_URL # change this if Render gives the API a different URL
         value: https://aurynix-apex.onrender.com
+      - key: API_PUBLIC_URL # the API link shown in the sidebar; calls still use API_URL
+        value: https://apex-api.aurynix.dev
       - key: API_WAKE_SECONDS # a sleeping API takes about a minute to wake
         value: "180"
       - key: API_KEY # the same key as the API, so visitors can use the demo without it

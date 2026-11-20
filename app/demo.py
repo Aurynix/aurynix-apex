@@ -28,6 +28,8 @@ DEMO_SOURCE = "demo_seed"
 DISPLAY_TIMEZONE = ZoneInfo("Asia/Jerusalem")  # follows daylight saving by itself
 DISPLAY_TIMEZONE_NAME = "Jerusalem time"
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
+# The API link shown in the sidebar, e.g. a custom domain. Calls still go to API_URL.
+API_PUBLIC_URL = (os.environ.get("API_PUBLIC_URL", "").strip() or API_URL).rstrip("/")
 API_KEY = os.environ.get("API_KEY", "").strip()  # server side only: never shown to visitors
 # How long to wait for a sleeping API to wake up (free hosting). 0 = fail at once (local use).
 API_WAKE_SECONDS = float(os.environ.get("API_WAKE_SECONDS", "0"))
@@ -419,7 +421,7 @@ def main() -> None:
         f"Top 20%: precision **{test['precision_top20']:.0%}**, "
         f"recall **{test['recall_top20']:.0%}**"
     )
-    st.sidebar.caption(f"API: {API_URL}")
+    st.sidebar.caption(f"API: {API_PUBLIC_URL}")
 
     single, batch, monitoring = st.tabs(["Score a lead", "Score a CSV", "Monitoring"])
     tabs = [
